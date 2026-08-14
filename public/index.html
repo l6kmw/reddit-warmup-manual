@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RedWarm 手动控制台</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel2: #1d212b;
+    --border: #2a2f3a;
+    --text: #d7dce3;
+    --muted: #8b93a1;
+    --accent: #ff6b35;
+    --accent2: #2f81f7;
+    --ok: #3fb950;
+    --warn: #d29922;
+    --err: #f85149;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    min-height: 68px; padding: 14px clamp(18px, 4vw, 56px);
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,14,20,.86);
+    backdrop-filter: blur(18px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 17px; font-weight: 700; letter-spacing: .3px; }
+  header .badge {
+    font-size: 11px; padding: 2px 10px; border-radius: 20px;
+    border: 1px solid var(--border); color: var(--muted);
+  }
+  header .badge.online { color: var(--ok); border-color: #2a5f35; background: #122018; }
+  header .status-run { margin-left: auto; font-size: 13px; color: var(--muted); }
+  header .status-run .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--muted); }
+  header .status-run.running .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  .layout { display: grid; grid-template-columns: 460px 1fr; gap: 16px; padding: 16px 24px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .panel > h2 {
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    background: var(--panel2); text-transform: none; letter-spacing: .3px;
+  }
+  .panel-body { padding: 14px 16px; }
+
+  fieldset { border: 1px solid var(--border); background: rgba(7,12,18,.28); border-radius: 10px; padding: 15px; margin-bottom: 14px; }
+  legend { font-size: 11px; color: var(--accent); padding: 0 8px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+  .row { display: flex; gap: 12px; margin-bottom: 12px; align-items: flex-start; }
+  .row:last-child { margin-bottom: 0; }
+  .col { flex: 1; min-width: 0; }
+  label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 10px; font-size: 13px; font-family: var(--mono);
+    outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent2); }
+  textarea { resize: vertical; min-height: 46px; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .toggle { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; }
+  .toggle input { width: auto; }
+
+  .actions { display: flex; gap: 10px; }
+  button {
+    flex: 1; border: none; border-radius: 8px; padding: 11px 16px;
+    font-size: 14px; font-weight: 600; cursor: pointer; color: #fff;
+    background: var(--accent); transition: filter .15s, transform .05s;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.stop { background: #3a2626; color: var(--err); border: 1px solid #5a3333; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat { background: linear-gradient(145deg, var(--panel2), var(--panel3)); border: 1px solid var(--border); border-radius: 10px; padding: 12px 10px; text-align: center; }
+  .stat .v { font-size: 21px; font-weight: 800; font-family: var(--mono); color: var(--text); }
+  .stat .k { font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: .4px; }
+
+  #log {
+    background: #080c11; border: 1px solid var(--border); border-radius: 10px;
+    font-family: var(--mono); font-size: 12px; line-height: 1.65;
+    height: calc(100vh - 250px); min-height: 420px; overflow-y: auto;
+    padding: 14px; white-space: pre-wrap; word-break: break-word;
+  }
+  #log .t { color: #506172; margin-right: 8px; }
+  #log .srv { color: var(--accent2); }
+  #log .err { color: var(--err); }
+  #log .ok { color: var(--ok); }
+  #log .warn { color: var(--warn); }
+
+  .notice {
+    background: rgba(227,179,65,.07); border: 1px solid rgba(227,179,65,.28); border-radius: 9px;
+    color: var(--warn); font-size: 11px; padding: 10px 12px; margin-top: 14px; line-height: 1.65;
+  }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.55; }
+  .toggle { display: flex; align-items: center; gap: 9px; padding: 7px 0; cursor: pointer; color: var(--text); font-weight: 600; }
+  .toggle input { width: 15px; height: 15px; accent-color: var(--accent); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #304354; border-radius: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔥 RedWarm 手动控制台</h1>
+  <span class="badge online">手动控制版</span>
+  <div class="status-run" id="runState"><span class="dot"></span><span id="runStateText">空闲</span></div>
+</header>
+
+<div class="layout">
+  <!-- 左：参数表单 -->
+  <div class="panel">
+    <h2>养号参数</h2>
+    <div class="panel-body">
+
+      <fieldset>
+        <legend>目标账号</legend>
+        <div class="row">
+          <div class="col">
+            <label for="targetType">账号来源</label>
+            <select id="targetType">
+              <option value="serial" selected>serial 序号</option>
+              <option value="profiles">AdsPower profile ID</option>
+              <option value="group">AdsPower 分组名</option>
+            </select>
+          </div>
+          <div class="col">
+            <label for="targetValue">取值（多个用英文逗号分隔）</label>
+            <input type="text" id="targetValue" placeholder="如 4,5,6,7 或 Reddit">
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>社区（sub）选择</legend>
+        <div class="row">
+          <div class="col">
+            <label for="subMode">模式</label>
+            <select id="subMode">
+              <option value="specified" selected>指定多个社区，随机从中选</option>
+              <option value="random">完全随机（从板块池抽）</option>
+            </select>
+          </div>
+          <div class="col">
+            <label for="subCount">每账号浏览板块数</label>
+            <input type="number" id="subCount" value="2" min="1" max="8">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label for="subs">指定社区列表（逗号或换行分隔，指定模式下必填）</label>
+            <textarea id="subs" placeholder="AmazonSeller,ecommerce,AmazonFBA"></textarea>
+            <div class="hint">板块池：<span id="subPoolHint">加载中…</span></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>时长与比例</legend>
+        <div class="row">
+          <div class="col">
+            <label for="minMinutes">每板块最短时长（分钟）</label>
+            <input type="number" id="minMinutes" value="2" min="1" max="180" step="1">
+          </div>
+          <div class="col">
+            <label for="maxMinutes">每板块最长时长（分钟）</label>
+            <input type="number" id="maxMinutes" value="4" min="1" max="180" step="1">
+          </div>
+        </div>
+        <div class="hint" style="margin-top:-5px;margin-bottom:10px">支持 1-180 分钟，可直接填写 20、30 等长时任务；系统会在最短与最长值之间随机取本轮时长。</div>
+        <div class="row">
+          <div class="col">
+            <label for="upvoteRatio">点赞比例 %（浏览帖中多大比例点赞）</label>
+            <input type="number" id="upvoteRatio" value="30" min="0" max="100">
+          </div>
+          <div class="col">
+            <label for="readRatio">进入阅读详情比例 %</label>
+            <input type="number" id="readRatio" value="60" min="0" max="100">
+          </div>
+          <div class="col">
+            <label for="commentRatio">评论比例 %（每板块触发评论概率）</label>
+            <input type="number" id="commentRatio" value="0" min="0" max="100">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label for="commentBank">评论内容库（每行一条，支持 {sub} 占位；评论比例 &gt; 0 时必填）</label>
+            <textarea id="commentBank" rows="4" placeholder="我去年也卡在这步，后来发现是权限配置的问题…&#10;这个帖子说得挺清楚，补充一点：记得先检查…"></textarea>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>发帖功能（按 karma + 近日发帖频率门控）</legend>
+        <label class="toggle"><input type="checkbox" id="postEnabled"> 开启自动发帖</label>
+        <div class="row" style="margin-top:8px">
+          <div class="col">
+            <label for="postTitle">帖子标题（支持 {sub}）</label>
+            <input type="text" id="postTitle" placeholder="例如：做 {sub} 三个月的一些踩坑总结">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label for="postText">帖子正文（至少 100 字，支持 {sub}）</label>
+            <textarea id="postText" rows="4" placeholder="正文内容…"></textarea>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label for="postSubs">发帖社区列表（随机选一个）</label>
+            <input type="text" id="postSubs" placeholder="AmazonSeller,ecommerce">
+          </div>
+          <div class="col">
+            <label for="postLookbackDays">近 N 天</label>
+            <input type="number" id="postLookbackDays" value="7" min="1" max="90">
+          </div>
+          <div class="col">
+            <label for="postMaxCount">发帖上限（N 天内）</label>
+            <input type="number" id="postMaxCount" value="2" min="1" max="30">
+          </div>
+        </div>
+        <div class="hint">门控规则：档位需 ≥ T2（注册≥30 天 + comment karma≥50），且近 N 天发帖数未达上限。不满足自动跳过并记入日志。</div>
+      </fieldset>
+
+      <fieldset>
+        <legend>高级</legend>
+        <div class="row">
+          <div class="col">
+            <label for="inputMode">输入模式（滚动）</label>
+            <select id="inputMode">
+              <option value="wheel" selected>wheel（真实滚轮，拟人）</option>
+              <option value="legacy">legacy（smooth scrollBy）</option>
+            </select>
+          </div>
+          <div class="col">
+            <label for="voteMode">点赞模式</label>
+            <select id="voteMode">
+              <option value="click-first" selected>click-first（真实点击 + API 降级）</option>
+              <option value="api-only">api-only（直接调用 /api/vote）</option>
+              <option value="mixed">mixed（A/B 观测预留）</option>
+            </select>
+          </div>
+          <div class="col">
+            <label for="seed">随机种子（可空，复现用）</label>
+            <input type="number" id="seed" placeholder="如 42">
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="actions">
+        <button id="btnRun" onclick="runTask()">▶ 启动养号</button>
+        <button class="stop" id="btnStop" onclick="stopTask()" disabled>■ 停止</button>
+      </div>
+
+      <div class="notice">⚠️ 本工具操作真实 Reddit 账号，多账号养号违反 Reddit 用户协议，存在封号风险；写操作（评论/发帖）全程过档位门控 + AI 痕迹检查。请自行评估风险。</div>
+    </div>
+  </div>
+
+  <!-- 右：状态与日志 -->
+  <div>
+    <div class="stats">
+      <div class="stat"><div class="v" id="stVisited">-</div><div class="k">浏览板块</div></div>
+      <div class="stat"><div class="v" id="stReads">-</div><div class="k">阅读帖子</div></div>
+      <div class="stat"><div class="v" id="stUpvoted">-</div><div class="k">点赞</div></div>
+      <div class="stat"><div class="v" id="stWrite">-</div><div class="k">评论/发帖</div></div>
+    </div>
+    <div class="panel">
+      <h2>运行日志（自动刷新）</h2>
+      <div class="panel-body" style="padding:10px">
+        <div id="log">等待任务启动…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  let since = 0;
+  let running = false;
+  const $ = (id) => document.getElementById(id);
+
+  // 板块池提示
+  fetch('/api/subs').then((r) => r.json()).then((d) => {
+    if (d && d.subs && d.subs.length) {
+      $('subPoolHint').textContent = d.subs.join('、');
+      if (!$('postSubs').value) $('postSubs').placeholder = d.subs.slice(0, 8).join(',');
+    }
+  }).catch(() => {});
+
+  function collectConfig() {
+    const num = (id, dft) => {
+      const v = Number($(id).value);
+      return Number.isFinite(v) ? v : dft;
+    };
+    const list = (id) => $(id).value.split(/[,，\n]/).map((s) => s.trim()).filter(Boolean);
+    return {
+      target: {
+        type: $('targetType').value,
+        value: $('targetValue').value.trim(),
+      },
+      subMode: $('subMode').value,
+      subs: list('subs'),
+      subCount: num('subCount', 2),
+      minMinutesPerSub: num('minMinutes', 2),
+      maxMinutesPerSub: num('maxMinutes', 4),
+      upvoteRatio: num('upvoteRatio', 30) / 100,
+      readRatio: num('readRatio', 60) / 100,
+      commentRatio: num('commentRatio', 0) / 100,
+      commentBank: $('commentBank').value.split(/\n/).map((s) => s.trim()).filter(Boolean),
+      post: {
+        enabled: $('postEnabled').checked,
+        title: $('postTitle').value.trim() || null,
+        text: $('postText').value.trim() || null,
+        subs: list('postSubs'),
+        lookbackDays: num('postLookbackDays', 7),
+        maxCount: num('postMaxCount', 2),
+      },
+      inputMode: $('inputMode').value,
+      voteMode: $('voteMode').value,
+      seed: $('seed').value ? Number($('seed').value) : null,
+    };
+  }
+
+  window.runTask = async function () {
+    const cfg = collectConfig();
+    if (!cfg.target.value) { alert('请填写目标账号'); return; }
+    if (cfg.subMode === 'specified' && !cfg.subs.length) { alert('指定社区模式下请填写社区列表'); return; }
+    if (cfg.commentRatio > 0 && !cfg.commentBank.length) { alert('评论比例 > 0 时必须填写评论内容库'); return; }
+    if (cfg.post.enabled && (!cfg.post.title || !cfg.post.text || !cfg.post.subs.length)) {
+      alert('开启发帖需填写：标题、正文、发帖社区列表'); return;
+    }
+    const res = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert('启动失败: ' + (data.error || res.status)); return; }
+    since = 0;
+    $('log').textContent = '';
+  };
+
+  window.stopTask = async function () {
+    if (!confirm('确定停止当前养号任务？正在进行的写操作会中断。')) return;
+    await fetch('/api/stop', { method: 'POST' });
+  };
+
+  // 状态轮询
+  async function pollStatus() {
+    try {
+      const res = await fetch('/api/status');
+      const st = await res.json();
+      running = st.running;
+      $('btnRun').disabled = running;
+      $('btnStop').disabled = !running;
+      const el = $('runState');
+      el.className = 'status-run' + (running ? ' running' : '');
+      $('runStateText').textContent = running
+        ? '运行中 ' + (st.startedAt ? new Date(st.startedAt).toLocaleTimeString('zh-CN') : '')
+        : (st.exitCode != null ? `已结束（退出码 ${st.exitCode}）` : '空闲');
+    } catch {
+      // 服务不可达
+    }
+  }
+
+  // 日志轮询
+  async function pollLogs() {
+    try {
+      const res = await fetch('/api/logs?since=' + since);
+      const data = await res.json();
+      since = data.since;
+      const box = $('log');
+      const autoScroll = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+      let last = { visited: 0, reads: 0, upvoted: 0, comments: 0, posts: 0 };
+      for (const item of data.logs) {
+        const line = item.line;
+        const m = line.match(/^@@STATUS@@(.+)$/);
+        const div = document.createElement('div');
+        const t = document.createElement('span');
+        t.className = 't';
+        t.textContent = new Date(item.t).toLocaleTimeString('zh-CN', { hour12: false });
+        div.appendChild(t);
+        if (m) {
+          try {
+            const st = JSON.parse(m[1]);
+            if (st.phase === 'account') {
+              last = { visited: st.visited || 0, reads: st.reads || 0, upvoted: st.upvoted || 0, comments: (st.comments || 0) + (st.posts || 0), posts: st.posts || 0 };
+              $('stVisited').textContent = st.visited || 0;
+              $('stReads').textContent = st.reads || 0;
+              $('stUpvoted').textContent = st.upvoted || 0;
+              $('stWrite').textContent = (st.comments || 0) + '/' + (st.posts || 0);
+              const tag = document.createElement('span');
+              tag.className = 'ok';
+              tag.textContent = '◉ ' + (st.name || st.serial || '') + ' 完成';
+              div.appendChild(tag);
+            } else if (st.phase === 'done') {
+              const tag = document.createElement('span');
+              tag.className = 'ok';
+              tag.textContent = '任务完成：' + JSON.stringify(st.summary || {});
+              div.appendChild(tag);
+            } else if (st.phase === 'error') {
+              const tag = document.createElement('span');
+              tag.className = 'err';
+              tag.textContent = '错误：' + (st.error || '');
+              div.appendChild(tag);
+            } else {
+              const tag = document.createElement('span');
+              tag.className = 'srv';
+              tag.textContent = '◉ ' + st.phase;
+              div.appendChild(tag);
+            }
+          } catch { /* ignore */ }
+          box.appendChild(div);
+          continue;
+        }
+        const text = document.createElement('span');
+        if (/失败|错误|风控|❌|被拒|⛔/.test(line)) text.className = 'err';
+        else if (/完成|✅|通过|已登录|成功/.test(line)) text.className = 'ok';
+        else if (/跳过|未|门控/.test(line)) text.className = 'warn';
+        else if (/^\[server\]/.test(line)) text.className = 'srv';
+        text.textContent = line;
+        div.appendChild(text);
+        box.appendChild(div);
+      }
+      while (box.childNodes.length > 3000) box.removeChild(box.firstChild);
+      if (autoScroll) box.scrollTop = box.scrollHeight;
+    } catch { /* ignore */ }
+  }
+
+  setInterval(pollStatus, 2000);
+  setInterval(pollLogs, 1500);
+  pollStatus();
+  pollLogs();
+})();
+</script>
+</body>
+</html>

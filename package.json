@@ -1,0 +1,13 @@
+{
+  "name": "reddit-warmup-manual",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reddit 养号手动控制版：HTML 控制台 + Node HTTP 服务，复用 reddit-warmup-skills 引擎",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check lib/config.js && node --check lib/runner.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
