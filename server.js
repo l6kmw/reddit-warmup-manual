@@ -32,6 +32,7 @@ const PUBLIC_DIR = path.join(ROOT, 'public');
 const RUNNER = path.join(ROOT, 'lib', 'runner.js');
 const SKILLS_ROOT = path.resolve(ROOT, '..', 'reddit-warmup-skills', 'reddit-warmup');
 const { parseConfig } = require(path.join(ROOT, 'lib', 'config'));
+const { createLogger, createLineBuffer } = require(path.join(ROOT, 'lib', 'logger'));
 
 // ---- 配置 ----
 function parsePort(argv) {
@@ -46,17 +47,18 @@ function parsePort(argv) {
 }
 const PORT = parsePort(process.argv.slice(2));
 
-// ---- 日志环形缓冲 ----
-const LOG_CAP = 2000;
-const logBuffer = []; // {n, t, line}
-let logSeq = 0;
-function appendLog(line) {
-  logBuffer.push({ n: logSeq, t: new Date().toISOString(), line: String(line).replace(/\r?\n$/, '') });
-  logSeq += 1;
-  if (logBuffer.length > LOG_CAP) logBuffer.splice(0, logBuffer.length - LOG_CAP);
+// ---- 结构化日志：内存增量读取 + logs/server-YYYY-MM-DD.jsonl 持久化 ----
+const logger = createLogger({
+  service: 'server',
+  directory: path.join(ROOT, 'logs'),
+  capacity: 2000,
+  minLevel: process.env.LOG_LEVEL || 'info',
+});
+function appendLog(line, context = {}) {
+  return logger.log(context.level || 'info', line, context);
 }
-function tailLogs(since = 0) {
-  return logBuffer.filter((item) => item.n >= since);
+function tailLogs(since = 0, level = null) {
+  return logger.tail({ since, level });
 }
 
 // ---- 任务状态 ----
@@ -71,6 +73,7 @@ function statusPayload() {
   return {
     running: Boolean(job),
     startedAt: job?.startedAt || null,
+    runId: job?.runId || null,
     config: job?.config || null,
     stopped: job?.stopped || false,
     exitCode: job?.exitCode ?? null,
@@ -168,25 +171,29 @@ async function startJob(config) {
   });
 
   const startedAt = new Date();
-  setJob({ child, startedAt, config: normalized, stopped: false, exitCode: null, stoppedBy: null, tmpFile });
+  const runId = `${startedAt.toISOString().replace(/\D/g, '').slice(0, 14)}-${child.pid}`;
+  setJob({ child, startedAt, runId, config: normalized, stopped: false, exitCode: null, stoppedBy: null, tmpFile });
 
-  appendLog(`[server] 任务已启动 ${startedAt.toLocaleString('zh-CN')} (pid ${child.pid})`);
-  appendLog(`[server] 配置: ${JSON.stringify(normalized).slice(0, 400)}`);
+  appendLog(`[server] 任务已启动 ${startedAt.toLocaleString('zh-CN')} (pid ${child.pid})`, { event: 'job.started', runId, pid: child.pid });
+  appendLog('[server] 配置已校验', { event: 'job.configured', runId, config: normalized });
 
-  child.stdout.on('data', (d) => {
-    for (const line of String(d).split('\n')) {
-      if (line.trim()) appendLog(line);
-    }
+  const stdoutLines = createLineBuffer((line) => {
+    if (line.trim()) appendLog(line, { source: 'runner', event: line.startsWith('@@STATUS@@') ? 'runner.status' : 'runner.output', runId });
   });
-  child.stderr.on('data', (d) => {
-    for (const line of String(d).split('\n')) {
-      if (line.trim()) appendLog(`[stderr] ${line}`);
-    }
+  const stderrLines = createLineBuffer((line) => {
+    if (line.trim()) appendLog(`[stderr] ${line}`, { level: 'error', source: 'runner', event: 'runner.stderr', runId });
   });
-  child.on('close', (code) => {
+  child.stdout.on('data', (chunk) => stdoutLines.push(chunk));
+  child.stderr.on('data', (chunk) => stderrLines.push(chunk));
+  child.on('error', (error) => {
+    appendLog(`[server] 子进程启动失败: ${error.message}`, { level: 'error', event: 'job.spawn_error', runId, error: { message: error.message, code: error.code } });
+  });
+  child.on('close', (code, signal) => {
+    stdoutLines.flush();
+    stderrLines.flush();
     const exitCode = code == null ? 'signal' : code;
-    lastRun = { finishedAt: new Date().toISOString(), exitCode, config: job?.config || config, stoppedBy: job?.stoppedBy || null };
-    appendLog(`[server] 任务结束，退出码 ${exitCode}`);
+    lastRun = { runId, finishedAt: new Date().toISOString(), exitCode, signal: signal || null, config: job?.config || config, stoppedBy: job?.stoppedBy || null };
+    appendLog(`[server] 任务结束，退出码 ${exitCode}`, { level: exitCode === 0 ? 'info' : 'warn', event: 'job.finished', runId, exitCode, signal: signal || null });
     if (job?.tmpFile) {
       try { fs.unlinkSync(job.tmpFile); } catch { /* ignore */ }
     }
@@ -200,7 +207,7 @@ function stopJob() {
   if (!job || job.stopped) return { ok: false, error: '当前没有运行中的任务' };
   job.stopped = true;
   job.stoppedBy = 'user';
-  appendLog('[server] 收到停止请求，发送 SIGTERM...');
+  appendLog('[server] 收到停止请求，发送 SIGTERM...', { level: 'warn', event: 'job.stop_requested', runId: job.runId, pid: job.child.pid });
   try {
     job.child.kill('SIGTERM');
   } catch {
@@ -226,8 +233,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && pathname === '/api/logs') {
       const since = Number(url.searchParams.get('since') || 0);
-      const logs = tailLogs(since);
-      return json(res, 200, { since: logSeq, logs });
+      const level = url.searchParams.get('level');
+      const logs = tailLogs(since, level);
+      return json(res, 200, { since: logger.sequence, logs });
     }
     if (req.method === 'GET' && pathname === '/api/subs') {
       return json(res, 200, { subs: loadSubPool(), mode: ['specified', 'random'] });
@@ -247,12 +255,13 @@ const server = http.createServer(async (req, res) => {
     }
     json(res, 404, { error: `Not Found: ${req.method} ${pathname}` });
   } catch (error) {
+    appendLog(`[server] 请求处理失败: ${error.message}`, { level: 'error', event: 'http.request_error', method: req.method, pathname, error: { message: error.message } });
     json(res, 400, { error: error.message });
   }
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  appendLog(`[server] 手动控制版已启动: http://127.0.0.1:${PORT}`);
+  appendLog(`[server] 手动控制版已启动: http://127.0.0.1:${PORT}`, { event: 'server.started', port: PORT });
   console.log(`手动控制版 Reddit 养号已启动 → http://127.0.0.1:${PORT}`);
   console.log('按 Ctrl+C 退出服务（运行中的养号任务会收到 SIGTERM 优雅关闭）。');
 });
@@ -261,7 +270,7 @@ server.listen(PORT, '127.0.0.1', () => {
 function shutdown(signal) {
   console.log(`\n收到 ${signal}，正在退出服务...`);
   if (job && !job.stopped) {
-    appendLog(`[server] 服务退出，停止任务 (pid ${job.child.pid})`);
+    appendLog(`[server] 服务退出，停止任务 (pid ${job.child.pid})`, { level: 'warn', event: 'server.shutdown_job', runId: job.runId, signal, pid: job.child.pid });
     try { job.child.kill('SIGTERM'); } catch { /* ignore */ }
   }
   setTimeout(() => process.exit(0), 1500).unref();

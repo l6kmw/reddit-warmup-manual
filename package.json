@@ -5,7 +5,8 @@
   "description": "Reddit 养号手动控制版：HTML 控制台 + Node HTTP 服务，复用 reddit-warmup-skills 引擎",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check lib/config.js && node --check lib/runner.js"
+    "check": "node --check server.js && node --check lib/config.js && node --check lib/logger.js && node --check lib/runner.js && node --check lib/logger.test.js && node --check lib/runner.test.js",
+    "test": "node lib/logger.test.js && node lib/runner.test.js"
   },
   "engines": {
     "node": ">=18"

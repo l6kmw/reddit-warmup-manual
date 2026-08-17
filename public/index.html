@@ -158,8 +158,9 @@
             </select>
           </div>
           <div class="col">
-            <label for="subCount">每账号浏览板块数</label>
+            <label for="subCount">每账号浏览板块次数</label>
             <input type="number" id="subCount" value="2" min="1" max="8">
+            <div class="hint">指定社区数量不足时会随机循环补足；完成设定次数后才切换下一账号。</div>
           </div>
         </div>
         <div class="row">
@@ -413,7 +414,8 @@
             } else if (st.phase === 'done') {
               const tag = document.createElement('span');
               tag.className = 'ok';
-              tag.textContent = '任务完成：' + JSON.stringify(st.summary || {});
+              tag.textContent = '任务完成：' + JSON.stringify(st.summary || {})
+                + (st.humanReportFile ? '｜可读报告：' + st.humanReportFile : '');
               div.appendChild(tag);
             } else if (st.phase === 'error') {
               const tag = document.createElement('span');
@@ -431,10 +433,10 @@
           continue;
         }
         const text = document.createElement('span');
-        if (/失败|错误|风控|❌|被拒|⛔/.test(line)) text.className = 'err';
+        if (item.level === 'error' || /失败|错误|风控|❌|被拒|⛔/.test(line)) text.className = 'err';
+        else if (item.level === 'warn' || /跳过|未|门控/.test(line)) text.className = 'warn';
         else if (/完成|✅|通过|已登录|成功/.test(line)) text.className = 'ok';
-        else if (/跳过|未|门控/.test(line)) text.className = 'warn';
-        else if (/^\[server\]/.test(line)) text.className = 'srv';
+        else if (item.source === 'server' || /^\[server\]/.test(line)) text.className = 'srv';
         text.textContent = line;
         div.appendChild(text);
         box.appendChild(div);
