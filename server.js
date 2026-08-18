@@ -31,7 +31,8 @@ const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const RUNNER = path.join(ROOT, 'lib', 'runner.js');
 const SKILLS_ROOT = path.resolve(ROOT, '..', 'reddit-warmup-skills', 'reddit-warmup');
-const { parseConfig } = require(path.join(ROOT, 'lib', 'config'));
+const { parseConfig, strList } = require(path.join(ROOT, 'lib', 'config'));
+const { fetchRuleSnapshots } = require(path.join(ROOT, 'lib', 'runner'));
 const { createLogger, createLineBuffer, parseStructuredLogLine } = require(path.join(ROOT, 'lib', 'logger'));
 
 // ---- 配置 ----
@@ -247,6 +248,16 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && pathname === '/api/subs') {
       return json(res, 200, { subs: loadSubPool(), mode: ['specified', 'random'] });
+    }
+    if (req.method === 'POST' && pathname === '/api/rules') {
+      if (job) return json(res, 409, { error: '养号任务运行中，不能同时读取规则' });
+      const body = await readBody(req);
+      if (!['serial', 'profiles', 'group'].includes(body.target?.type) || !body.target?.value) {
+        return json(res, 400, { error: '请填写有效目标账号' });
+      }
+      const subs = [...new Set(strList(body.subs))];
+      if (!subs.length) return json(res, 400, { error: '请填写社区' });
+      return json(res, 200, await fetchRuleSnapshots(body.target, subs));
     }
     if (req.method === 'POST' && pathname === '/api/run') {
       const config = await readBody(req);

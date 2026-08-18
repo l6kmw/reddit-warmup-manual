@@ -6,122 +6,182 @@
 <title>RedWarm 手动控制台</title>
 <style>
   :root {
-    --bg: #0f1115;
-    --panel: #171a21;
-    --panel2: #1d212b;
-    --border: #2a2f3a;
-    --text: #d7dce3;
-    --muted: #8b93a1;
-    --accent: #ff6b35;
-    --accent2: #2f81f7;
-    --ok: #3fb950;
-    --warn: #d29922;
-    --err: #f85149;
+    --bg: #0b0d10;
+    --panel: #12151a;
+    --panel2: #181c22;
+    --panel3: #20252d;
+    --border: #292f38;
+    --border-strong: #39414d;
+    --text: #edf0f3;
+    --muted: #929aa6;
+    --faint: #606975;
+    --accent: #ff5a1f;
+    --accent-hover: #ff713d;
+    --blue: #56a8ff;
+    --ok: #4fc06a;
+    --warn: #e9b949;
+    --err: #ff6159;
     --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg); color: var(--text);
-    font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-    min-height: 100vh;
-  }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.55 var(--sans); min-height: 100vh; }
   header {
-    display: flex; align-items: center; gap: 12px;
-    min-height: 68px; padding: 14px clamp(18px, 4vw, 56px);
-    border-bottom: 1px solid var(--border);
-    background: rgba(10,14,20,.86);
-    backdrop-filter: blur(18px);
-    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 14px; min-height: 72px;
+    padding: 12px max(24px, calc((100vw - 1560px) / 2));
+    border-bottom: 1px solid var(--border); background: rgba(11, 13, 16, .94);
+    backdrop-filter: blur(16px); position: sticky; top: 0; z-index: 20;
   }
-  header h1 { font-size: 17px; font-weight: 700; letter-spacing: .3px; }
-  header .badge {
-    font-size: 11px; padding: 2px 10px; border-radius: 20px;
-    border: 1px solid var(--border); color: var(--muted);
+  .brand-mark {
+    display: grid; place-items: center; width: 38px; height: 38px; border-radius: 8px;
+    color: #fff; background: var(--accent); font-size: 18px; font-weight: 900;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset;
   }
-  header .badge.online { color: var(--ok); border-color: #2a5f35; background: #122018; }
-  header .status-run { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .brand-copy { min-width: 0; }
+  header h1 { font-size: 16px; font-weight: 760; letter-spacing: 0; line-height: 1.25; }
+  .brand-subtitle { margin-top: 2px; color: var(--muted); font-size: 11px; }
+  header .badge { font-size: 11px; padding: 4px 9px; border-radius: 5px; border: 1px solid var(--border); color: var(--muted); background: var(--panel2); }
+  header .badge.online { color: var(--ok); border-color: rgba(79,192,106,.34); background: rgba(79,192,106,.08); }
+  header .status-run {
+    margin-left: auto; min-width: 104px; padding: 8px 11px; border: 1px solid var(--border);
+    border-radius: 6px; font: 12px/1 var(--mono); color: var(--muted); background: var(--panel);
+  }
   header .status-run .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--muted); }
   header .status-run.running .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); animation: pulse 1.4s infinite; }
   @keyframes pulse { 50% { opacity: .35; } }
 
-  .layout { display: grid; grid-template-columns: 460px 1fr; gap: 16px; padding: 16px 24px; max-width: 1400px; margin: 0 auto; }
-  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
-
-  .panel {
-    background: var(--panel); border: 1px solid var(--border);
-    border-radius: 10px; overflow: hidden;
+  .section-nav {
+    display: flex; align-items: center; gap: 4px; overflow-x: auto;
+    padding: 10px max(24px, calc((100vw - 1560px) / 2));
+    border-bottom: 1px solid var(--border); background: #0e1115; scrollbar-width: none;
   }
+  .section-nav::-webkit-scrollbar { display: none; }
+  .section-nav a {
+    flex: none; color: var(--muted); text-decoration: none; font-size: 12px; font-weight: 650;
+    padding: 7px 10px; border-radius: 5px; border: 1px solid transparent;
+  }
+  .section-nav a:hover { color: var(--text); background: var(--panel2); border-color: var(--border); }
+
+  .layout {
+    display: grid; grid-template-columns: minmax(620px, 1.35fr) minmax(420px, .85fr);
+    align-items: start; gap: 18px; padding: 20px 24px 32px; max-width: 1608px; margin: 0 auto;
+  }
+  .monitor { position: sticky; top: 112px; min-width: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .panel > h2 {
-    font-size: 13px; font-weight: 600; color: var(--muted);
-    padding: 10px 16px; border-bottom: 1px solid var(--border);
-    background: var(--panel2); text-transform: none; letter-spacing: .3px;
+    display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700;
+    color: var(--text); padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel2); letter-spacing: 0;
   }
-  .panel-body { padding: 14px 16px; }
+  .panel > h2 small { color: var(--faint); font: 10px/1 var(--mono); }
+  .panel-body { padding: 16px; }
 
-  fieldset { border: 1px solid var(--border); background: rgba(7,12,18,.28); border-radius: 10px; padding: 15px; margin-bottom: 14px; }
-  legend { font-size: 11px; color: var(--accent); padding: 0 8px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-  .row { display: flex; gap: 12px; margin-bottom: 12px; align-items: flex-start; }
+  fieldset {
+    scroll-margin-top: 132px; border: 1px solid var(--border); background: #0f1216;
+    border-radius: 7px; padding: 18px; margin-bottom: 14px;
+  }
+  fieldset:focus-within { border-color: var(--border-strong); }
+  legend { font-size: 12px; color: var(--text); padding: 0 8px; font-weight: 750; letter-spacing: 0; }
+  legend::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 8px; background: var(--accent); vertical-align: 1px; }
+  .row { display: flex; gap: 14px; margin-bottom: 14px; align-items: flex-start; }
   .row:last-child { margin-bottom: 0; }
   .col { flex: 1; min-width: 0; }
-  label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+  label { display: block; font-size: 11px; color: #b7bec7; margin-bottom: 6px; font-weight: 650; }
   input[type="text"], input[type="number"], select, textarea {
-    width: 100%; background: var(--panel2); color: var(--text);
-    border: 1px solid var(--border); border-radius: 6px;
-    padding: 7px 10px; font-size: 13px; font-family: var(--mono);
-    outline: none;
+    width: 100%; min-height: 38px; padding: 8px 10px; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 5px; font-size: 12px; font-family: var(--mono);
+    outline: none; transition: border-color .15s, box-shadow .15s, background .15s;
   }
-  input:focus, select:focus, textarea:focus { border-color: var(--accent2); }
-  textarea { resize: vertical; min-height: 46px; }
-  .hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
-  .toggle { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; }
-  .toggle input { width: auto; }
+  input:hover, select:hover, textarea:hover { border-color: var(--border-strong); }
+  input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(86,168,255,.11); background: #1b2027; }
+  textarea { resize: vertical; min-height: 64px; line-height: 1.55; }
+  .hint { font-size: 10px; color: var(--muted); margin-top: 5px; line-height: 1.55; }
+  .toggle { display: flex; align-items: center; gap: 9px; padding: 7px 0; cursor: pointer; color: var(--text); font-weight: 650; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
 
-  .actions { display: flex; gap: 10px; }
-  button {
-    flex: 1; border: none; border-radius: 8px; padding: 11px 16px;
-    font-size: 14px; font-weight: 600; cursor: pointer; color: #fff;
-    background: var(--accent); transition: filter .15s, transform .05s;
+  .actions {
+    display: grid; grid-template-columns: 1fr 132px; gap: 10px; position: sticky; bottom: 0;
+    z-index: 8; padding: 12px 0; background: linear-gradient(180deg, transparent, var(--panel) 22%);
   }
-  button:hover { filter: brightness(1.1); }
+  button {
+    border: 1px solid transparent; border-radius: 6px; min-height: 40px; padding: 9px 14px;
+    font-size: 12px; font-weight: 750; cursor: pointer; color: #fff; background: var(--accent);
+    transition: background .15s, border-color .15s, transform .05s;
+  }
+  button:hover { background: var(--accent-hover); }
   button:active { transform: translateY(1px); }
   button:disabled { opacity: .45; cursor: not-allowed; }
-  button.stop { background: #3a2626; color: var(--err); border: 1px solid #5a3333; }
+  button.stop { background: transparent; color: var(--err); border-color: rgba(255,97,89,.35); }
+  button.stop:hover { background: rgba(255,97,89,.1); border-color: rgba(255,97,89,.6); }
+  #btnRules { width: auto; background: var(--panel3); color: var(--text); border-color: var(--border-strong); }
+  #btnRules:hover { background: #292f38; }
 
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
-  .stat { background: linear-gradient(145deg, var(--panel2), var(--panel3)); border: 1px solid var(--border); border-radius: 10px; padding: 12px 10px; text-align: center; }
-  .stat .v { font-size: 21px; font-weight: 800; font-family: var(--mono); color: var(--text); }
-  .stat .k { font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: .4px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 7px; padding: 13px 10px 11px; text-align: left; min-width: 0; }
+  .stat .v { font-size: 22px; line-height: 1.1; font-weight: 780; font-family: var(--mono); color: var(--text); }
+  .stat .k { font-size: 10px; color: var(--muted); margin-top: 7px; white-space: nowrap; }
+  .stat:first-child { border-top-color: var(--accent); }
+  .stat:nth-child(2) { border-top-color: var(--blue); }
+  .stat:nth-child(3) { border-top-color: var(--ok); }
+  .stat:nth-child(4) { border-top-color: var(--warn); }
 
   #log {
-    background: #080c11; border: 1px solid var(--border); border-radius: 10px;
-    font-family: var(--mono); font-size: 12px; line-height: 1.65;
-    height: calc(100vh - 250px); min-height: 420px; overflow-y: auto;
-    padding: 14px; white-space: pre-wrap; word-break: break-word;
+    height: calc(100vh - 236px); min-height: 440px; overflow-y: auto; padding: 14px;
+    background: #080a0d; border: 1px solid #222831; border-radius: 5px;
+    font-family: var(--mono); font-size: 11px; line-height: 1.72; color: #bdc5cf;
+    white-space: pre-wrap; word-break: break-word;
   }
   #log .t { color: #506172; margin-right: 8px; }
-  #log .srv { color: var(--accent2); }
+  #log .srv { color: var(--blue); }
   #log .err { color: var(--err); }
   #log .ok { color: var(--ok); }
   #log .warn { color: var(--warn); }
-
   .notice {
-    background: rgba(227,179,65,.07); border: 1px solid rgba(227,179,65,.28); border-radius: 9px;
-    color: var(--warn); font-size: 11px; padding: 10px 12px; margin-top: 14px; line-height: 1.65;
+    background: rgba(233,185,73,.06); border-left: 3px solid var(--warn); border-radius: 4px;
+    color: #cfb86f; font-size: 10px; padding: 10px 12px; margin-top: 4px; line-height: 1.65;
   }
-  .hint { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.55; }
-  .toggle { display: flex; align-items: center; gap: 9px; padding: 7px 0; cursor: pointer; color: var(--text); font-weight: 600; }
-  .toggle input { width: 15px; height: 15px; accent-color: var(--accent); }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #304354; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb { background: #343b45; border-radius: 8px; }
+
+  @media (max-width: 1120px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .monitor { position: static; order: -1; }
+    #log { height: 320px; min-height: 260px; }
+  }
+  @media (max-width: 720px) {
+    header { padding: 10px 14px; min-height: 64px; }
+    .brand-mark { width: 34px; height: 34px; }
+    .brand-subtitle, header .badge { display: none; }
+    .section-nav { padding: 8px 12px; }
+    .layout { padding: 12px; gap: 12px; }
+    .panel-body { padding: 12px; }
+    fieldset { padding: 14px 12px; }
+    .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 11px; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .actions { grid-template-columns: 1fr 104px; }
+    #log { height: 280px; min-height: 240px; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>🔥 RedWarm 手动控制台</h1>
+  <div class="brand-mark" aria-hidden="true">R</div>
+  <div class="brand-copy">
+    <h1>RedWarm 控制台</h1>
+    <div class="brand-subtitle">账号预热任务编排与实时监控</div>
+  </div>
   <span class="badge online">手动控制版</span>
   <div class="status-run" id="runState"><span class="dot"></span><span id="runStateText">空闲</span></div>
 </header>
+
+<nav class="section-nav" aria-label="参数分区">
+  <a href="#targetSection">目标账号</a>
+  <a href="#communitySection">社区选择</a>
+  <a href="#behaviorSection">行为参数</a>
+  <a href="#publishSection">发帖门控</a>
+  <a href="#advancedSection">高级设置</a>
+</nav>
 
 <div class="layout">
   <!-- 左：参数表单 -->
@@ -129,7 +189,7 @@
     <h2>养号参数</h2>
     <div class="panel-body">
 
-      <fieldset>
+      <fieldset id="targetSection">
         <legend>目标账号</legend>
         <div class="row">
           <div class="col">
@@ -147,7 +207,7 @@
         </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset id="communitySection">
         <legend>社区（sub）选择</legend>
         <div class="row">
           <div class="col">
@@ -170,9 +230,11 @@
             <div class="hint">板块池：<span id="subPoolHint">加载中…</span></div>
           </div>
         </div>
+        <button type="button" id="btnRules" onclick="loadRules()">读取社区规则（发帖预填 Hash）</button>
+        <div class="hint" id="rulesStatus">评论执行前会自动读取实时 Hash；此按钮用于查看规则并预填发帖 Hash。</div>
       </fieldset>
 
-      <fieldset>
+      <fieldset id="behaviorSection">
         <legend>时长与比例</legend>
         <div class="row">
           <div class="col">
@@ -205,9 +267,16 @@
             <textarea id="commentBank" rows="4" placeholder="我去年也卡在这步，后来发现是权限配置的问题…&#10;这个帖子说得挺清楚，补充一点：记得先检查…"></textarea>
           </div>
         </div>
+        <div class="row">
+          <div class="col">
+            <label for="commentRules">评论未决规则确认 JSON（可选，不用填写 Hash）</label>
+            <textarea id="commentRules" rows="3" placeholder='{"AmazonSeller":{"confirmedUnresolved":["rule-abc","context-relevance"]}}'></textarea>
+            <div class="hint">执行评论前自动读取实时 Hash；只有 preflight 返回未决项时才需在这里确认。</div>
+          </div>
+        </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset id="publishSection">
         <legend>发帖功能（按 karma + 近日发帖频率门控）</legend>
         <label class="toggle"><input type="checkbox" id="postEnabled"> 开启自动发帖</label>
         <div class="row" style="margin-top:8px">
@@ -236,10 +305,16 @@
             <input type="number" id="postMaxCount" value="2" min="1" max="30">
           </div>
         </div>
-        <div class="hint">门控规则：档位需 ≥ T2（注册≥30 天 + comment karma≥50），且近 N 天发帖数未达上限。不满足自动跳过并记入日志。</div>
+        <div class="row">
+          <div class="col">
+            <label for="postRules">发帖规则确认 JSON（按社区，可含 flair）</label>
+            <textarea id="postRules" rows="3" placeholder='{"ecommerce":{"ack":"当前规则 hash","confirmedUnresolved":["rule-abc"],"flair":"Discussion"}}'></textarea>
+          </div>
+        </div>
+        <div class="hint">门控规则：档位需 ≥ T2、近日频率未达上限，并通过实时社区规则 hash / 未决项 / flair 审查。</div>
       </fieldset>
 
-      <fieldset>
+      <fieldset id="advancedSection">
         <legend>高级</legend>
         <div class="row">
           <div class="col">
@@ -274,7 +349,7 @@
   </div>
 
   <!-- 右：状态与日志 -->
-  <div>
+  <div class="monitor">
     <div class="stats">
       <div class="stat"><div class="v" id="stVisited">-</div><div class="k">浏览板块</div></div>
       <div class="stat"><div class="v" id="stReads">-</div><div class="k">阅读帖子</div></div>
@@ -282,7 +357,7 @@
       <div class="stat"><div class="v" id="stWrite">-</div><div class="k">评论/发帖</div></div>
     </div>
     <div class="panel">
-      <h2>运行日志（自动刷新）</h2>
+      <h2><span>运行日志</span><small>LIVE / AUTO REFRESH</small></h2>
       <div class="panel-body" style="padding:10px">
         <div id="log">等待任务启动…</div>
       </div>
@@ -311,6 +386,11 @@
       return Number.isFinite(v) ? v : dft;
     };
     const list = (id) => $(id).value.split(/[,，\n]/).map((s) => s.trim()).filter(Boolean);
+    const jsonMap = (id) => {
+      const value = $(id).value.trim();
+      if (!value) return {};
+      try { return JSON.parse(value); } catch { throw new Error($(id).previousElementSibling.textContent + ' 格式错误'); }
+    };
     return {
       target: {
         type: $('targetType').value,
@@ -325,11 +405,13 @@
       readRatio: num('readRatio', 60) / 100,
       commentRatio: num('commentRatio', 0) / 100,
       commentBank: $('commentBank').value.split(/\n/).map((s) => s.trim()).filter(Boolean),
+      commentRules: jsonMap('commentRules'),
       post: {
         enabled: $('postEnabled').checked,
         title: $('postTitle').value.trim() || null,
         text: $('postText').value.trim() || null,
         subs: list('postSubs'),
+        rules: jsonMap('postRules'),
         lookbackDays: num('postLookbackDays', 7),
         maxCount: num('postMaxCount', 2),
       },
@@ -340,13 +422,15 @@
   }
 
   window.runTask = async function () {
-    const cfg = collectConfig();
+    let cfg;
+    try { cfg = collectConfig(); } catch (error) { alert(error.message); return; }
     if (!cfg.target.value) { alert('请填写目标账号'); return; }
     if (cfg.subMode === 'specified' && !cfg.subs.length) { alert('指定社区模式下请填写社区列表'); return; }
     if (cfg.commentRatio > 0 && !cfg.commentBank.length) { alert('评论比例 > 0 时必须填写评论内容库'); return; }
     if (cfg.post.enabled && (!cfg.post.title || !cfg.post.text || !cfg.post.subs.length)) {
       alert('开启发帖需填写：标题、正文、发帖社区列表'); return;
     }
+    if (cfg.post.enabled && !Object.keys(cfg.post.rules).length) { alert('开启发帖必须填写发帖规则确认 JSON'); return; }
     const res = await fetch('/api/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -356,6 +440,43 @@
     if (!res.ok) { alert('启动失败: ' + (data.error || res.status)); return; }
     since = 0;
     $('log').textContent = '';
+  };
+
+  window.loadRules = async function () {
+    const target = { type: $('targetType').value, value: $('targetValue').value.trim() };
+    const subs = [...new Set([...$('subs').value.split(/[,，\n]/), ...$('postSubs').value.split(/[,，\n]/)].map((s) => s.trim()).filter(Boolean))];
+    if (!target.value || !subs.length) { alert('请先填写目标账号和社区'); return; }
+    const button = $('btnRules');
+    button.disabled = true;
+    $('rulesStatus').textContent = '正在通过目标账号读取 Reddit 实时规则…';
+    try {
+      const res = await fetch('/api/rules', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, subs }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '读取失败');
+      const merge = (id, includeFlair) => {
+        let current = {};
+        try { current = JSON.parse($(id).value || '{}'); } catch { /* 用实时结果修复无效 JSON */ }
+        for (const item of data.results.filter((result) => result.ok)) {
+          const old = current[item.subreddit] || current[item.subreddit.toLowerCase()] || {};
+          current[item.subreddit] = {
+            ack: item.hash,
+            confirmedUnresolved: old.confirmedUnresolved || [],
+            ...(includeFlair && old.flair ? { flair: old.flair } : {}),
+          };
+          delete current[item.subreddit.toLowerCase()];
+        }
+        $(id).value = JSON.stringify(current, null, 2);
+      };
+      merge('postRules', true);
+      const failed = data.results.filter((item) => !item.ok);
+      $('rulesStatus').textContent = `已读取 ${data.results.length - failed.length}/${data.results.length} 个社区` + (failed.length ? `；失败：${failed.map((item) => item.subreddit).join('、')}` : '。请继续用 preflight 审查未决项。');
+    } catch (error) {
+      $('rulesStatus').textContent = '读取失败：' + error.message;
+    } finally {
+      button.disabled = false;
+    }
   };
 
   window.stopTask = async function () {
