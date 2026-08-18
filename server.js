@@ -32,7 +32,7 @@ const PUBLIC_DIR = path.join(ROOT, 'public');
 const RUNNER = path.join(ROOT, 'lib', 'runner.js');
 const SKILLS_ROOT = path.resolve(ROOT, '..', 'reddit-warmup-skills', 'reddit-warmup');
 const { parseConfig } = require(path.join(ROOT, 'lib', 'config'));
-const { createLogger, createLineBuffer } = require(path.join(ROOT, 'lib', 'logger'));
+const { createLogger, createLineBuffer, parseStructuredLogLine } = require(path.join(ROOT, 'lib', 'logger'));
 
 // ---- 配置 ----
 function parsePort(argv) {
@@ -181,7 +181,15 @@ async function startJob(config) {
     if (line.trim()) appendLog(line, { source: 'runner', event: line.startsWith('@@STATUS@@') ? 'runner.status' : 'runner.output', runId });
   });
   const stderrLines = createLineBuffer((line) => {
-    if (line.trim()) appendLog(`[stderr] ${line}`, { level: 'error', source: 'runner', event: 'runner.stderr', runId });
+    if (!line.trim()) return;
+    const parsed = parseStructuredLogLine(line, 'error');
+    appendLog(`[stderr] ${line}`, {
+      level: parsed.level,
+      source: 'runner',
+      event: parsed.event || 'runner.stderr',
+      runId,
+      stream: 'stderr',
+    });
   });
   child.stdout.on('data', (chunk) => stdoutLines.push(chunk));
   child.stderr.on('data', (chunk) => stderrLines.push(chunk));
