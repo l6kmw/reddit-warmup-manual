@@ -311,7 +311,7 @@
             <textarea id="postRules" rows="3" placeholder='{"ecommerce":{"ack":"当前规则 hash","confirmedUnresolved":["rule-abc"],"flair":"Discussion"}}'></textarea>
           </div>
         </div>
-        <div class="hint">门控规则：档位需 ≥ T2、近日频率未达上限，并通过实时社区规则 hash / 未决项 / flair 审查。</div>
+        <div class="hint">门控规则：近日频率未达上限，并通过实时社区规则 hash / 未决项 / flair 审查；账号资格由发帖脚本执行时自动判断。</div>
       </fieldset>
 
       <fieldset id="advancedSection">
@@ -337,6 +337,8 @@
             <input type="number" id="seed" placeholder="如 42">
           </div>
         </div>
+        <label class="toggle"><input type="checkbox" id="skipTierGate"> 写操作绕过账号档位门控（测试模式）</label>
+        <div class="hint">开启后评论/发帖不再受账号档位限制；AI 痕迹、社区规则、频率门控仍生效。风险自负。</div>
       </fieldset>
 
       <div class="actions">
@@ -344,7 +346,7 @@
         <button class="stop" id="btnStop" onclick="stopTask()" disabled>■ 停止</button>
       </div>
 
-      <div class="notice">⚠️ 本工具操作真实 Reddit 账号，多账号养号违反 Reddit 用户协议，存在封号风险；写操作（评论/发帖）全程过档位门控 + AI 痕迹检查。请自行评估风险。</div>
+      <div class="notice">⚠️ 本工具操作真实 Reddit 账号，多账号养号违反 Reddit 用户协议，存在封号风险；写操作（评论/发帖）全程过账号资格与 AI 痕迹检查。请自行评估风险。</div>
     </div>
   </div>
 
@@ -418,6 +420,7 @@
       inputMode: $('inputMode').value,
       voteMode: $('voteMode').value,
       seed: $('seed').value ? Number($('seed').value) : null,
+      skipTierGate: $('skipTierGate').checked,
     };
   }
 
