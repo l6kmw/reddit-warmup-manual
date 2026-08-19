@@ -30,7 +30,7 @@ const { spawn } = require('child_process');
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const RUNNER = path.join(ROOT, 'lib', 'runner.js');
-const SKILLS_ROOT = path.resolve(ROOT, '..', 'reddit-warmup-skills', 'reddit-warmup');
+const ENGINE_ROOT = path.join(ROOT, 'engine');
 const { parseConfig, strList } = require(path.join(ROOT, 'lib', 'config'));
 const { fetchRuleSnapshots } = require(path.join(ROOT, 'lib', 'runner'));
 const { createLogger, createLineBuffer, parseStructuredLogLine } = require(path.join(ROOT, 'lib', 'logger'));
@@ -86,7 +86,7 @@ function statusPayload() {
 // ---- 读取板块池 ----
 function loadSubPool() {
   try {
-    const { SUB_POOL } = require(path.join(SKILLS_ROOT, 'scripts', 'warmup'));
+    const { SUB_POOL } = require(path.join(ENGINE_ROOT, 'scripts', 'warmup'));
     return Array.isArray(SUB_POOL) ? SUB_POOL : [];
   } catch {
     return [];

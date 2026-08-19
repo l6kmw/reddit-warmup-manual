@@ -9,3 +9,4 @@ screenshots/
 !.env.example
 .playwright-cli/
 output/
+engine/reports/

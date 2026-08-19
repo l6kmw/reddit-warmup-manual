@@ -1,56 +1,96 @@
 # RedWarm 手动控制版
 
-Reddit 养号的手动控制界面版：浏览器打开控制台，填参数、点启动，即可对指定账号跑养号任务。
+Reddit 养号的独立手动控制台：填写账号和社区参数、点击启动，即可运行浏览、阅读、点赞、评论和发帖任务。
 
-与 `reddit-warmup-skills`（自动调度版）的关系：**复用其全部引擎**（AdsPower 连接、登录/karma 巡检、风险档位门控、拟人滚动/阅读/点赞、评论/发帖的完整门控），只新增了参数化控制层。
+项目已经内置养号引擎和 AdsPower 浏览器适配层。其他使用者只需下载本仓库并执行 `npm install`，不需要再下载 `reddit-warmup-skills`，也不需要单独安装 `adspower-browser` Skill。
 
-> ⚠️ 使用须知：本工具用于多账号养号，违反 Reddit 用户协议，有封号及指纹标记风险。写操作（评论/发帖）全程过档位门控 + AI 痕迹检查，但**后果自负**。
+> 使用须知：本工具用于多账号养号，可能违反 Reddit 用户协议，并存在封号及浏览器指纹标记风险。评论和发帖会经过档位、频率、社区规则及内容检查，但风险仍由使用者承担。
 
 ## 目录结构
 
-```
+```text
 reddit-warmup-manual/
-├── server.js          # HTTP 服务入口（启动文件）
-├── lib/runner.js      # 养号执行器（子进程，复用 reddit-warmup-skills 引擎）
-├── lib/logger.js      # 结构化日志（环形缓冲、JSONL 持久化、敏感字段脱敏）
-├── public/index.html  # HTML 控制台
-├── state/posts.json   # 近日发帖频率状态（自动生成）
-└── logs/              # 运行报告 JSON/Markdown + 服务日志 JSONL（自动生成）
+├── server.js                    # HTTP 服务和任务进程管理
+├── lib/
+│   ├── runner.js                # 手动任务编排器
+│   ├── config.js                # 服务端与 Runner 共用的配置校验
+│   └── logger.js                # 结构化日志
+├── engine/                      # 内置自动化引擎
+│   ├── lib/                     # 规则、点赞、状态和浏览辅助能力
+│   ├── scripts/                 # 浏览、巡检、评论和发帖脚本
+│   └── adspower-browser/lib/    # AdsPower 浏览器适配层
+├── public/index.html            # HTML 控制台
+├── state/posts.json             # 近期发帖频率状态（自动生成）
+└── logs/                        # 运行报告和服务日志（自动生成）
 ```
 
-## 启动
+## 环境要求
+
+- Node.js 18 或更高版本
+- AdsPower 客户端正在运行
+- AdsPower 中已有可用并登录 Reddit 的浏览器 Profile
+- 本机能够正常访问 Reddit
+
+所有 JavaScript 依赖都由当前项目的 `npm install` 安装。
+
+## 安装与启动
 
 ```bash
-cd /Users/xskj/Ai/reddit-warmup-manual
-node server.js                 # 默认端口 8787
-node server.js --port 9000     # 或 PORT=9000 指定端口
+cd reddit-warmup-manual
+npm install
+npm start
 ```
 
-浏览器打开 `http://127.0.0.1:8787`。
+默认打开：`http://127.0.0.1:8787`
 
-依赖：Node ≥ 18，且 `../reddit-warmup-skills/reddit-warmup` 已装好依赖（`npm install` 过），AdsPower 客户端在运行。
+指定端口：
 
-## 控制台可配置项
+```bash
+npm start -- --port 9000
+# 或
+PORT=9000 npm start
+```
+
+运行检查：
+
+```bash
+npm run check
+npm test
+```
+
+## 控制台配置
 
 | 配置 | 说明 |
 |---|---|
-| 目标账号 | serial 序号 / AdsPower profile ID / AdsPower 分组名，支持多个（逗号分隔） |
-| 社区模式 | 指定多个社区随机选 / 完全随机从板块池抽；遇到 banned 时，单个指定社区直接返回结果，多个指定社区或完全随机会自动换一个未确认封禁的社区 |
-| 每账号板块数 | 每个账号本轮实际浏览次数；指定社区数量不足时随机循环补足（例如只填 1 个社区、设置 4 次，会浏览该社区 4 次），完成后才切换下一账号 |
-| 每板块时长 | 逗留时长区间（分钟），支持 1-180 分钟，可直接配置 20-30 分钟长时任务；拟人滚动 + 阅读 |
-| 点赞比例 | 浏览列表收集的候选帖中，按比例随机点赞（真实点击 + API 降级） |
-| 阅读详情比例 | 浏览过程中按概率打开帖子详情阅读（内容长度驱动节奏） |
-| 评论比例 | 每个板块按概率触发一条评论（内容来自评论库，过账号安全/质量/AI/实时社区规则门控） |
-| 评论规则确认 | 执行前自动读取当前规则 hash；仅在预审出现未决项时人工填写确认项 |
-| 发帖功能 | 开关 + 标题/正文 + 社区列表 + 每社区规则确认/flair；门控 = 近日频率 + 实时社区规则；账号资格由发帖脚本执行时判断 |
-| 绕过档位门控 | 高级设置开关，开启后评论/发帖不再受账号档位限制（测试模式，其余门控保留，风险自负） |
+| 目标账号 | AdsPower serial、Profile ID 或分组名，支持逗号分隔多个值 |
+| 社区模式 | 指定社区，或从内置社区池随机选择 |
+| 每账号板块数 | 当前账号本轮实际执行的社区浏览次数 |
+| 每板块时长 | 每个社区的停留时长区间，范围 1-180 分钟 |
+| 点赞比例 | 对候选帖随机点赞的概率 |
+| 阅读详情比例 | 浏览时打开帖子详情阅读的概率 |
+| 评论比例 | 每个社区触发一条评论的概率 |
+| 评论规则确认 | 实时读取规则 Hash，并记录仍需人工确认的项目 |
+| 发帖功能 | 标题、正文、候选社区、规则确认、Flair 和频率限制 |
+| 绕过档位门控 | 仅用于测试；其他规则和内容门控仍然保留 |
 
-### 发帖门控（新增，区别于自动版）
+## 运行流程
 
-- **账号资格**：由 `post.js` 在发帖时自动检查（安全门控，不做展示）；勾选“绕过档位门控”后改用 `--force-tier T2` 测试参数，仅放行档位检查，其余门控不变。
-- **近日发帖频率门控**：手动版新增状态文件 `state/posts.json`，记录每账号发帖时间戳；近 `lookbackDays` 天内发帖数达到 `maxCount` 即拒绝。默认近 7 天 ≤ 2 篇，可在控制台调整。
-- **多社区随机选**：`post.subs` 列表里随机挑一个板块发帖。
-- **实时规则门控**：评论执行前自动读取目标社区当前规则并使用实时 `ack`，无需手填 hash。发帖可点“读取社区规则”预填 hash。`confirmedUnresolved` 与发帖 `flair` 不会自动猜测，仍需按 `scripts/preflight.js` 结果人工填写。评论必须提供明确帖子 URL；手控版会把这些确认透传给最新版 `comment.js` / `post.js`。
+1. 控制台向 `POST /api/run` 提交配置。
+2. 服务端使用 `lib/config.js` 校验并规范化配置。
+3. 服务端把配置写入临时 JSON，并启动 `lib/runner.js` 子进程。
+4. Runner 使用内置 `engine/` 连接 AdsPower，逐账号、逐社区串行执行任务。
+5. 评论和发帖通过内置 `comment.js`、`post.js` 子进程执行完整门控。
+6. Runner 通过标准输出发送日志和 `@@STATUS@@` 状态事件。
+7. 服务端把日志写入内存环形缓冲和每日 JSONL 文件。
+8. 任务结束后在 `logs/` 生成 JSON 和 Markdown 报告。
+
+## 写操作门控
+
+- **账号资格**：评论和发帖脚本根据账号年龄及 Karma 计算风险档位。
+- **近期发帖频率**：`state/posts.json` 记录每个账号的发帖时间戳，默认近 7 天最多 2 篇。
+- **实时社区规则**：评论前自动读取当前规则 Hash；发帖规则可在控制台中预读取。
+- **未决项确认**：无法自动判断的规则条款需要确认，Flair 不会被自动猜测。
+- **内容检查**：评论和发帖继续使用内置引擎中的质量与 AI 痕迹检查。
 
 ## API
 
@@ -58,36 +98,23 @@ node server.js --port 9000     # 或 PORT=9000 指定端口
 |---|---|---|
 | GET | `/` | 控制台页面 |
 | GET | `/api/status` | 当前任务状态 |
-| GET | `/api/logs?since=N&level=warn` | 增量结构化日志；`level` 可选，返回该等级及以上日志 |
-| GET | `/api/subs` | 板块池 |
-| POST | `/api/rules` | 用目标列表第一个账号实时读取社区规则 Hash |
-| POST | `/api/run` | 启动任务（JSON 配置） |
-| POST | `/api/stop` | 停止任务（SIGTERM 优雅关闭 profile） |
+| GET | `/api/logs?since=N&level=warn` | 增量结构化日志 |
+| GET | `/api/subs` | 内置社区池 |
+| POST | `/api/rules` | 使用目标账号读取社区规则 |
+| POST | `/api/run` | 启动任务 |
+| POST | `/api/stop` | 向当前 Runner 发送 SIGTERM |
 
-## 与自动版的差异
+## 日志与状态
 
-| | 自动版（reddit-warmup-skills） | 手动控制版（本目录） |
-|---|---|---|
-| 交互 | 命令行 / 定时调度 | HTML 控制台，手动点按钮 |
-| 参数 | CLI flags | 表单实时配置 |
-| 点赞/阅读/评论 | 固定区间 | 显式比例（0-100%） |
-| 社区规则门控 | 实时规则 hash + 未决项确认 | 复用同一门控，控制台按社区传入确认 |
-| 发帖频率门控 | 无（仅档位） | 新增近 N 天频率门控 |
-| 账号资格分析 | 控制台可见 | 隐藏（写操作由脚本内部门控） |
-| 报告 | reports/ 下 JSON+MD | logs/ 下完整 JSON + 人类可读 Markdown + 控制台实时日志 |
+服务日志同时写入：
 
-## 日志设计
+- 内存环形缓冲：供控制台增量轮询，默认保留 2000 条。
+- `logs/server-YYYY-MM-DD.jsonl`：用于长期留存和故障排查。
 
-服务日志同时写入内存环形缓冲和 `logs/server-YYYY-MM-DD.jsonl`。控制台通过 `/api/logs` 增量拉取内存日志，磁盘 JSONL 用于长期留存与故障排查。
+日志包含单调递增序号、时间、等级、来源、事件名和 `runId`。名称匹配 password、token、secret、cookie、authorization、proxy 的上下文字段会在持久化前替换为 `[REDACTED]`。
 
-每条日志至少包含：
+可通过 `LOG_LEVEL=debug|info|warn|error` 调整最低日志等级。日志持久化失败不会中断运行任务。
 
-- `n`：服务进程内单调递增序号，用作增量游标。
-- `t`：ISO 8601 时间。
-- `level`：`debug` / `info` / `warn` / `error`。
-- `source`、`event`：日志来源与稳定事件名，例如 `server/job.started`、`runner/runner.stderr`。
-- `runId`：一次任务的关联 ID，串联启动、runner 输出、停止和退出事件。
-- `line`：供人阅读、与旧控制台兼容的文本。
-- 其他上下文字段：如 `pid`、`exitCode`、`signal`、`config`。
+## 独立分发边界
 
-对象上下文中名称匹配 password、token、secret、cookie、authorization、proxy 的字段会在持久化前替换为 `[REDACTED]`。可通过环境变量 `LOG_LEVEL=debug|info|warn|error` 调整最低记录等级，默认 `info`。日志持久化失败只写入 stderr，不中断养号任务。
+本仓库现在包含运行所需的 JavaScript 源码，不依赖旁边存在另一个源码仓库。它仍然需要 AdsPower 桌面客户端、有效 Profile 和 Reddit 登录态，这些属于运行时外部服务，不随源码分发。
