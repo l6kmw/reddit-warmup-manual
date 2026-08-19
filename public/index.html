@@ -445,36 +445,91 @@
     $('log').textContent = '';
   };
 
+  // 与引擎 lib/community-rules.js reviewContent 的 unresolved 判定保持一致：
+  // - 规则带 unresolvedClauses → 每条子句需确认（id 为 rule.id:clause.id）
+  // - 规则无子句但无法可靠判定（mode=unknown / 无分类 / require 无 flair）→ 整条规则需确认
+  // - 评论动作额外含 context-relevance（评论与帖子无词汇关联时）
+  function computeUnresolvedIds(rules, action) {
+    const ids = [];
+    for (const rule of rules || []) {
+      const cats = rule.categories || [];
+      const clauses = rule.unresolvedClauses || [];
+      if (!clauses.length) {
+        const deterministicallyChecked = cats.some((category) => {
+          if (category === 'links') return true;
+          if (category === 'flair') return rule.mode === 'require';
+          if (category === 'title_format') {
+            return /title.*(?:question|\?|start|begin|prefix)|(?:all[ -]?)?caps|标题.*(?:问句|开头|前缀|全大写)/i.test(`${rule.title || ''}\n${rule.description || ''}`);
+          }
+          return true; // 引擎 extractSignals 恒包含该字段 → 视为已判定
+        });
+        if (rule.mode === 'unknown' || !cats.length || !deterministicallyChecked ||
+            (rule.mode === 'require' && !cats.includes('flair'))) {
+          ids.push(rule.id);
+        }
+      } else {
+        for (const clause of clauses) ids.push(`${rule.id}:${clause.id}`);
+      }
+    }
+    if (action === 'comment') ids.push('context-relevance');
+    return [...new Set(ids)];
+  }
+
   window.loadRules = async function () {
     const target = { type: $('targetType').value, value: $('targetValue').value.trim() };
-    const subs = [...new Set([...$('subs').value.split(/[,，\n]/), ...$('postSubs').value.split(/[,，\n]/)].map((s) => s.trim()).filter(Boolean))];
-    if (!target.value || !subs.length) { alert('请先填写目标账号和社区'); return; }
+    // 社区列表取 浏览社区 + 发帖社区 的并集；两者都为空时自动回退到板块池
+    let subs = [...new Set([...$('subs').value.split(/[,，\n]/), ...$('postSubs').value.split(/[,，\n]/)].map((s) => s.trim()).filter(Boolean))];
+    let usedPoolFallback = false;
+    if (!target.value) { alert('请先填写目标账号'); return; }
+    if (!subs.length) {
+      try {
+        const poolRes = await fetch('/api/subs');
+        const poolData = await poolRes.json();
+        subs = Array.isArray(poolData.subs) ? poolData.subs : [];
+        usedPoolFallback = true;
+      } catch { /* 板块池拉取失败则继续走空列表提示 */ }
+    }
+    if (!subs.length) { alert('请先填写社区，或确认板块池可用'); return; }
     const button = $('btnRules');
     button.disabled = true;
-    $('rulesStatus').textContent = '正在通过目标账号读取 Reddit 实时规则…';
+    $('rulesStatus').textContent = usedPoolFallback
+      ? `未填写社区列表，已自动使用板块池全部 ${subs.length} 个社区读取规则（逐个访问 Reddit，可能需要几分钟）…`
+      : '正在通过目标账号读取 Reddit 实时规则…';
     try {
       const res = await fetch('/api/rules', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, subs }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '读取失败');
-      const merge = (id, includeFlair) => {
+      // 自动计算每个社区需要确认的未决项（与引擎 reviewContent 一致）
+      const unresolvedFor = (item, action) => computeUnresolvedIds(item.rules || [], action);
+      // 检测社区是否强制要求 flair（发帖时必填）
+      const flairRequiredFor = (item) => (item.rules || []).some((rule) =>
+        rule.mode === 'require' && (rule.categories || []).includes('flair'));
+      const merge = (id, action, includeFlair) => {
         let current = {};
         try { current = JSON.parse($(id).value || '{}'); } catch { /* 用实时结果修复无效 JSON */ }
         for (const item of data.results.filter((result) => result.ok)) {
           const old = current[item.subreddit] || current[item.subreddit.toLowerCase()] || {};
-          current[item.subreddit] = {
-            ack: item.hash,
-            confirmedUnresolved: old.confirmedUnresolved || [],
-            ...(includeFlair && old.flair ? { flair: old.flair } : {}),
-          };
+          const auto = unresolvedFor(item, action);
+          // 保留用户已填的确认项（防重复、去重），再并上自动计算的
+          const merged = [...new Set([...(old.confirmedUnresolved || []), ...auto])];
+          const entry = { ack: item.hash, confirmedUnresolved: merged };
+          if (includeFlair && old.flair) entry.flair = old.flair;
+          current[item.subreddit] = entry;
           delete current[item.subreddit.toLowerCase()];
         }
         $(id).value = JSON.stringify(current, null, 2);
       };
-      merge('postRules', true);
+      // 发帖规则确认（含 flair）+ 评论未决规则确认（自动填 context-relevance）
+      merge('postRules', 'post', true);
+      merge('commentRules', 'comment', false);
       const failed = data.results.filter((item) => !item.ok);
-      $('rulesStatus').textContent = `已读取 ${data.results.length - failed.length}/${data.results.length} 个社区` + (failed.length ? `；失败：${failed.map((item) => item.subreddit).join('、')}` : '。请继续用 preflight 审查未决项。');
+      const needFlair = data.results.filter((item) => item.ok && flairRequiredFor(item)).map((item) => item.subreddit);
+      let status = `已读取 ${data.results.length - failed.length}/${data.results.length} 个社区，未决项已自动确认`;
+      if (needFlair.length) status += `；⚠️ ${needFlair.join('、')} 要求发帖 flair，请到发帖规则确认 JSON 补填`;
+      if (failed.length) status += `；失败：${failed.map((item) => item.subreddit).join('、')}`;
+      $('rulesStatus').textContent = status;
     } catch (error) {
       $('rulesStatus').textContent = '读取失败：' + error.message;
     } finally {

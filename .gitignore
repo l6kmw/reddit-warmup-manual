@@ -7,3 +7,5 @@ screenshots/
 .env
 .env.*
 !.env.example
+.playwright-cli/
+output/
