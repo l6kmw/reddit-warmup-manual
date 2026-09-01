@@ -10,3 +10,6 @@ screenshots/
 .playwright-cli/
 output/
 engine/reports/
+
+# Go build output
+rag-service/rag-service
