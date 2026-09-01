@@ -39,6 +39,21 @@ node lib/outreach/sender.js --config /tmp/outreach-send.json
 | `compose`（默认） | 经 AdsPower 浏览器打开 Reddit 私信 compose 页面发送；兼容新版 UI，发送后消息同步出现在 Chat 会话中。实测不受 Chat 房间创建限额影响 |
 | `matrix` | 直连 Reddit Chat 的 Matrix API（`matrix.redditspace.com`）发送，无需操作页面 DOM。注意 Reddit 对 `createRoom` 有 **24 小时房间数量限额**（`M_LIMIT_EXCEEDED`），新用户量大时会触限；触限后条目标记 `failed`，可 `requeue` 等限额重置后重发 |
 
+**触达消息去模板化（`personalize`）：**
+
+队列草稿默认由同一 `template` 渲染（只换 `{username}`），大量相同句式容易被 Reddit 内容指纹判定为垃圾消息（与账号被 spam 标记相关）。发送前可用 LLM 按**帖子标题 + 评论片段**逐条生成个性化初信：
+
+```bash
+# 发送配置加 personalize: true → 发送前懒个性化（LLM 失败自动回退原草稿，不阻塞）
+node lib/outreach/sender.js --config /tmp/outreach-send.json   # {"personalize": true, ...}
+
+# 批量重写队列既有模板草稿（dry-run 预览；--apply 落盘；--limit N 限量）
+node lib/outreach/personalize.js --config /tmp/pers-cfg.json --limit 5
+node lib/outreach/personalize.js --config /tmp/pers-cfg.json --apply --limit 20
+```
+
+个性化产出会过校验（占位符残留 / 模板句式黑名单 / 长度 15–90 词），不合格或 LLM 不可用一律保留原稿；已个性化条目（`personalizedAt`）幂等跳过。LLM 复用 `openai` provider（888api.vip / `gpt-5.6-sol`，key 走环境变量）。
+
 ## AI 客服对话（Replier）
 
 发送成功（进入 Chat 会话）的用户，可启动客服轮询：**自动检测对方新回复 → AI 生成回复 → 自动发送 → 全量审计**，敏感场景自动转人工。

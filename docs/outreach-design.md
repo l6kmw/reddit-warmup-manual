@@ -114,6 +114,34 @@ New 排序 limit100     近48h/分数≥1       OP/版主/机器人/已联系
 
 后续可接入真实 LLM Provider（扩展 `ai-provider.js` 注册表）与产品知识库（复用 `context` 字段）。
 
+## 7.1 触达消息去模板化（personalize）
+
+**背景**：队列草稿由同一 `template` 渲染（`queue.js buildQueueItem → renderDraft`），所有用户收到相同句式；
+Reddit 内容指纹会把高频同模板私信判为 spam（34/35 号机被标记与此相关）。实测佐证：35 号机账号
+（1 个月龄、0 贡献、1 karma、机房 IP）在批量模板私信后收到账号级 `M_FORBIDDEN: User is flagged for spam`
+（Matrix 403 与 compose GraphQL 拒绝，跨用户一致）。
+
+**设计**（`lib/outreach/personalize.js`）：
+
+- 纯函数：`buildPersonalizePrompt(item)` 把 username/sub/postTitle/commentSnippet 组装成生成提示；
+  `validatePersonalized(text)` 校验空 / 占位符残留 / 模板句式黑名单 / 长度 15–90 词；`isPersonalized(item)` 幂等判断
+- `maybePersonalize(draft, provider, item)`：调 `provider.completeText`（OpenAIProvider 新增的通用生成方法，
+  不解析 `[NEEDS_HUMAN]` 协议）；LLM 失败或校验不过 → `kept:true` 回退原稿，**绝不阻塞发送**
+- 集成：`sender.js` 发送循环内懒个性化（配置 `personalize:true`，失败自动降级原稿继续发）；
+  CLI `node lib/outreach/personalize.js --config <cfg> [--apply] [--limit N]` 批量重写队列既有草稿
+  （dry-run 默认，`--apply` 原子写回，已个性化条目跳过）
+- 成本控制：发送前才生成（不预生成 127 条）；LLM 超时 60s、单条 maxTokens 260
+
+**实测样本**（888api.vip / gpt-5.6-sol，dry-run）：
+
+| before（模板） | after（个性化，引用评论细节） |
+|---|---|
+| Hi BobasLostBounty, I saw your comment on No sign of roots on sod after 23 days. | Three weeks in and the grass is growing well is at least a good sign, but I'd be curious whether the sod is rooting into... |
+| Hi ngrafs, I saw your comment on ... | That's impressive—rooted within 14 days after watering 18 minutes per zone, three times a day, while mine is still loose... |
+| Hi mental-floss, I saw your comment on ... | That makes sense—after 23 days, I'd be worried too if the grass was growing but still hadn't rooted. Have you used start... |
+
+三条句式互不相同、均引用具体细节，通过全部校验（rewritten=3, kept=0）。
+
 ## 8. 落地清单
 
 - [ ] `lib/outreach/discover.js`（含测试）
