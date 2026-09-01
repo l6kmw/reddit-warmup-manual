@@ -12,6 +12,33 @@ Reddit 养号的独立手动控制台：填写账号和社区参数、点击启�
 
 源码依赖全部包含在当前仓库中。运行时仍需 AdsPower 桌面客户端、有效浏览器 Profile、Reddit 登录态和可用网络。
 
+## 私信触达（Outreach）
+
+独立于养号的自动私信扩展（设计文档见 `docs/outreach-design.md`）：
+
+1. **发现**：指定社区 + 标题关键词 → 拉取 recent 帖子 → 收集评论者
+2. **队列**：评论者全量入队（仅排除帖主/版主/机器人/已联系用户），跨运行去重
+3. **发送**：全自动经 AdsPower 浏览器限频发送私信（单次执行数量可配置，默认 20 条，间隔随机 60–120s）
+4. **审计**：`logs/outreach-YYYY-MM-DD.jsonl`（逐条发送记录）+ Markdown 运行报告
+
+控制台「私信触达」Tab 提供发现/发送/停止操作与只读队列监控。
+运行前置条件：AdsPower 客户端、目标 Profile 已登录 Reddit、本机可访问 Reddit。
+
+```bash
+# 命令行单独运行（等价于控制台操作）
+node lib/outreach/discover.js --config /tmp/outreach-discover.json
+node lib/outreach/sender.js --config /tmp/outreach-send.json
+```
+
+配置文件需包含：`target`（serial/profiles/group）、`sub`、`keywords`、`template`（含 `{username}`），以及可选风控参数（`runLimit`/`sendIntervalMin`/`sendIntervalMax` 等，见 `lib/config.js parseOutreachConfig`）。
+
+**发送通道 `channel`（默认 `compose`）：**
+
+| channel | 说明 |
+|---|---|
+| `compose`（默认） | 经 AdsPower 浏览器打开 Reddit 私信 compose 页面发送；兼容新版 UI，发送后消息同步出现在 Chat 会话中。实测不受 Chat 房间创建限额影响 |
+| `matrix` | 直连 Reddit Chat 的 Matrix API（`matrix.redditspace.com`）发送，无需操作页面 DOM。注意 Reddit 对 `createRoom` 有 **24 小时房间数量限额**（`M_LIMIT_EXCEEDED`），新用户量大时会触限；触限后条目标记 `failed`，可 `requeue` 等限额重置后重发 |
+
 ## 目录结构
 
 ```text
@@ -20,7 +47,8 @@ reddit-warmup-manual/
 ├── lib/
 │   ├── runner.js                # 手动任务编排器
 │   ├── config.js                # 服务端与 Runner 共用的配置校验
-│   └── logger.js                # 结构化日志
+│   ├── logger.js                # 结构化日志
+│   └── outreach/                # 私信触达模块（discover/queue/sender + 测试）
 ├── engine/                      # 内置自动化引擎
 │   ├── lib/                     # 规则、点赞、状态和浏览辅助能力
 │   ├── scripts/                 # 浏览、巡检、评论和发帖脚本
@@ -109,6 +137,12 @@ npm test
 | POST | `/api/rules` | 使用目标账号读取社区规则 |
 | POST | `/api/run` | 启动任务 |
 | POST | `/api/stop` | 向当前 Runner 发送 SIGTERM |
+| GET | `/api/outreach/status` | 私信触达任务状态 + 队列统计 |
+| GET | `/api/outreach/queue?status=` | 候选队列（只读，可按状态过滤） |
+| GET | `/api/outreach/report?date=` | 私信触达审计报告（JSONL） |
+| POST | `/api/outreach/discover` | 启动评论者发现并入队 |
+| POST | `/api/outreach/send` | 启动全自动发送（pending 队列） |
+| POST | `/api/outreach/stop` | 停止当前私信触达任务 |
 
 ## 日志与状态
 

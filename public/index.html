@@ -140,6 +140,44 @@
     background: rgba(233,185,73,.06); border-left: 3px solid var(--warn); border-radius: 4px;
     color: #cfb86f; font-size: 10px; padding: 10px 12px; margin-top: 4px; line-height: 1.65;
   }
+
+  /* ---- 私信触达（Outreach）监控面板 ---- */
+  .outreach-wrap { max-width: 1608px; margin: 0 auto; padding: 0 24px 32px; }
+  .outreach-bar {
+    display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; flex-wrap: wrap;
+  }
+  .outreach-bar .badge { font-size: 11px; padding: 4px 9px; border-radius: 5px; border: 1px solid var(--border); color: var(--muted); background: var(--panel2); }
+  .outreach-bar .badge.online { color: var(--ok); border-color: rgba(79,192,106,.34); background: rgba(79,192,106,.08); }
+  .outreach-bar .badge.warn { color: var(--warn); border-color: rgba(233,185,73,.34); background: rgba(233,185,73,.08); }
+  .outreach-bar .badge.err { color: var(--err); border-color: rgba(255,97,89,.34); background: rgba(255,97,89,.08); }
+  .outreach-grid { display: grid; grid-template-columns: minmax(420px, .9fr) minmax(0, 1.5fr); align-items: start; gap: 18px; }
+  .queue-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .queue-table th {
+    text-align: left; padding: 8px 10px; color: var(--muted); font-weight: 700; white-space: nowrap;
+    border-bottom: 1px solid var(--border); background: var(--panel2);
+  }
+  .queue-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; }
+  .queue-table tr:hover td { background: rgba(255,255,255,.015); }
+  .queue-table .mono { font-family: var(--mono); font-size: 10px; }
+  .q-status { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 750; line-height: 1.5; }
+  .q-status.pending { color: var(--blue); background: rgba(86,168,255,.1); }
+  .q-status.sent { color: var(--ok); background: rgba(79,192,106,.1); }
+  .q-status.failed { color: var(--err); background: rgba(255,97,89,.1); }
+  .q-status.skipped { color: var(--muted); background: rgba(146,154,166,.1); }
+  .queue-scroll { max-height: 420px; overflow-y: auto; }
+  .btn-outreach { background: var(--panel3); color: var(--text); border-color: var(--border-strong); }
+  .btn-outreach:hover { background: #292f38; }
+  .btn-outreach.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  .btn-outreach.primary:hover { background: var(--accent-hover); }
+  .btn-outreach.stop { background: transparent; color: var(--err); border-color: rgba(255,97,89,.35); }
+  .btn-outreach.stop:hover { background: rgba(255,97,89,.1); }
+
+  @media (max-width: 1120px) {
+    .outreach-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 720px) {
+    .outreach-wrap { padding: 0 12px 24px; }
+  }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #343b45; border-radius: 8px; }
@@ -162,6 +200,191 @@
     .actions { grid-template-columns: 1fr 104px; }
     #log { height: 280px; min-height: 240px; }
   }
+  /* ---- v2 console refinement ---- */
+  :root {
+    --bg: #090b0f;
+    --panel: #11151b;
+    --panel2: #171c23;
+    --panel3: #1d242d;
+    --border: #28313b;
+    --border-strong: #45515e;
+    --text: #f1f4f6;
+    --muted: #9ba5b1;
+    --faint: #687482;
+    --accent: #ff6a2a;
+    --accent-hover: #ff8148;
+    --blue: #6bb6ff;
+    --ok: #63d27e;
+    --warn: #f0c35a;
+    --err: #ff716b;
+    --shadow: 0 16px 38px rgba(0, 0, 0, .22);
+  }
+  body {
+    background:
+      linear-gradient(180deg, rgba(255, 106, 42, .035), transparent 22rem),
+      var(--bg);
+    color: var(--text);
+  }
+  header {
+    min-height: 78px;
+    padding: 14px clamp(16px, 4vw, 64px);
+    background: rgba(9, 11, 15, .92);
+    border-bottom-color: rgba(255, 255, 255, .08);
+  }
+  .brand-mark { width: 42px; height: 42px; font-size: 20px; box-shadow: 0 8px 18px rgba(255, 106, 42, .2); }
+  header h1 { font-size: 17px; letter-spacing: .01em; }
+  .brand-subtitle { font-size: 11px; color: #aab3bd; }
+  header .badge { padding: 5px 9px; }
+  header .status-run { min-width: 118px; padding: 9px 12px; }
+  .section-nav {
+    position: sticky; top: 78px; z-index: 18;
+    padding: 9px clamp(16px, 4vw, 64px);
+    background: rgba(14, 17, 21, .9);
+    border-bottom-color: rgba(255, 255, 255, .07);
+    backdrop-filter: blur(14px);
+  }
+  .section-nav a { padding: 8px 12px; border-radius: 6px; color: #aeb7c1; }
+  .section-nav a:first-child { color: var(--text); background: rgba(255, 255, 255, .055); }
+  .section-nav a:last-child { color: #ff9a72 !important; background: rgba(255, 106, 42, .09); border-color: rgba(255, 106, 42, .2); }
+  .layout { max-width: 1608px; padding: 28px clamp(16px, 4vw, 64px) 24px; gap: 22px; }
+  .panel { border-radius: 9px; border-color: rgba(255, 255, 255, .09); box-shadow: var(--shadow); }
+  .panel > h2 { min-height: 48px; padding: 14px 18px; background: linear-gradient(90deg, rgba(255, 255, 255, .045), transparent); }
+  .panel-body { padding: 18px; }
+  fieldset { background: rgba(8, 11, 15, .5); border-color: rgba(255, 255, 255, .08); }
+  fieldset + fieldset { margin-top: 16px; }
+  legend { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #d9dee3; }
+  legend::before { width: 7px; height: 7px; border-radius: 2px; }
+  label { color: #c0c8d0; }
+  input[type="text"], input[type="number"], select, textarea { background: #151a20; border-color: #2b3540; }
+  input:hover, select:hover, textarea:hover { border-color: #566372; }
+  .actions { padding-top: 16px; }
+  .actions button:first-child { box-shadow: 0 8px 20px rgba(255, 106, 42, .14); }
+  .monitor { top: 132px; }
+  .stats { gap: 10px; }
+  .stat { padding: 15px 12px 13px; background: #10141a; border-color: rgba(255, 255, 255, .09); }
+  .stat .v { font-size: 24px; }
+  .stat .k { color: #a4aeb9; }
+  #log { background: #07090c; border-color: #202832; }
+  .outreach-wrap {
+    max-width: 1608px;
+    margin: 0 auto;
+    padding: 12px clamp(16px, 4vw, 64px) 54px;
+  }
+  .outreach-bar {
+    min-height: 58px;
+    margin: 8px 0 16px;
+    padding: 0 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
+  }
+  .outreach-bar h2 { font-size: 16px !important; letter-spacing: .01em; }
+  .outreach-bar::before { content: "LIVE OUTREACH"; color: var(--accent); font: 10px var(--mono); letter-spacing: .12em; margin-right: 2px; }
+  .outreach-grid { gap: 22px; }
+  .outreach-grid > .panel:first-child { border-top: 2px solid var(--accent); }
+  .outreach-grid > .panel:last-child { border-top: 2px solid var(--blue); }
+  .outreach-grid .panel > h2 { background: linear-gradient(90deg, rgba(255, 106, 42, .09), transparent); }
+  .outreach-grid > .panel:last-child > h2 { background: linear-gradient(90deg, rgba(107, 182, 255, .08), transparent); }
+  .outreach-grid fieldset { margin-bottom: 12px; }
+  .hint.err { color: var(--err); }
+  .hint.ok { color: var(--ok); }
+  .hint.warn { color: var(--warn); }
+  .outreach-grid .notice { margin-top: 12px; }
+  .outreach-grid .btn-outreach { min-height: 42px; }
+  .queue-scroll { max-height: 520px; }
+  .queue-table th { position: sticky; top: 0; z-index: 2; background: #1a2028; }
+  .queue-table td { padding: 10px; }
+  .q-status { min-width: 55px; text-align: center; }
+  @media (max-width: 1120px) {
+    .section-nav { top: 64px; }
+    .monitor { top: 86px; }
+    .outreach-wrap { padding-top: 18px; }
+  }
+  /* ---- outreach layout alignment ---- */
+  .outreach-grid > .panel:first-child .panel-body { padding: 20px; }
+  .outreach-grid > .panel:last-child .panel-body { padding: 20px; }
+  .outreach-grid fieldset {
+    margin: 0 0 18px;
+    padding: 20px;
+  }
+  .outreach-grid fieldset:last-of-type { margin-bottom: 0; }
+  .outreach-grid .row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: start;
+  }
+  .outreach-grid fieldset:nth-of-type(2) .row:first-of-type {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .outreach-grid fieldset:nth-of-type(2) .row:nth-of-type(2) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 76%;
+  }
+  .outreach-grid label {
+    min-height: 32px;
+    display: flex;
+    align-items: flex-start;
+    line-height: 1.45;
+    margin-bottom: 7px;
+  }
+  .outreach-grid input[type="text"],
+  .outreach-grid input[type="number"],
+  .outreach-grid textarea {
+    min-height: 42px;
+  }
+  .outreach-grid textarea#oTemplate { min-height: 112px; }
+  .outreach-grid .notice { margin: 0; }
+  .outreach-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.15fr) auto auto;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .outreach-actions button { min-width: 0; white-space: nowrap; }
+  .outreach-actions .btn-outreach.stop { min-width: 74px; }
+  .outreach-status-line {
+    min-height: 24px;
+    margin-top: 10px;
+    padding: 4px 2px 0;
+  }
+  .outreach-grid .stats {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .outreach-grid .stat { min-height: 78px; }
+  .outreach-grid .queue-table { table-layout: fixed; }
+  .outreach-grid .queue-table th:nth-child(1) { width: 82px; }
+  .outreach-grid .queue-table th:nth-child(2) { width: 142px; }
+  .outreach-grid .queue-table th:nth-child(3) { width: 26%; }
+  .outreach-grid .queue-table th:nth-child(5) { width: 148px; }
+  .outreach-grid .queue-table td:nth-child(4) { color: #b9c3cd; line-height: 1.5; }
+
+  @media (max-width: 1280px) {
+    .outreach-grid fieldset:nth-of-type(2) .row:first-of-type {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .outreach-grid fieldset:nth-of-type(2) .row:nth-of-type(2) { max-width: none; }
+    .outreach-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 720px) {
+    .outreach-grid > .panel:first-child .panel-body,
+    .outreach-grid > .panel:last-child .panel-body { padding: 14px; }
+    .outreach-grid fieldset { padding: 16px 12px; }
+    .outreach-grid .row,
+    .outreach-grid fieldset:nth-of-type(2) .row:first-of-type,
+    .outreach-grid fieldset:nth-of-type(2) .row:nth-of-type(2) {
+      grid-template-columns: minmax(0, 1fr);
+      max-width: none;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .outreach-grid label { min-height: 0; }
+    .outreach-actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .outreach-actions button { white-space: normal; }
+    .outreach-grid .stats { gap: 6px; }
+    .outreach-grid .stat { min-height: 70px; }
+  }
 </style>
 </head>
 <body>
@@ -181,6 +404,7 @@
   <a href="#behaviorSection">行为参数</a>
   <a href="#publishSection">发帖门控</a>
   <a href="#advancedSection">高级设置</a>
+  <a href="#outreachSection" style="color:var(--accent)">私信触达</a>
 </nav>
 
 <div class="layout">
@@ -367,6 +591,105 @@
   </div>
 </div>
 
+<!-- 私信触达（Outreach）监控面板 -->
+<div class="outreach-wrap" id="outreachSection">
+  <div class="outreach-bar">
+    <h2 style="font-size:14px;font-weight:780">私信触达（自动）</h2>
+    <span class="badge" id="outreachRunBadge">空闲</span>
+    <span class="badge" id="outreachDaily">本次最多发送 20 条</span>
+  </div>
+  <div class="outreach-grid">
+    <div class="panel">
+      <h2>触达配置与操作 <small>/api/outreach/*</small></h2>
+      <div class="panel-body">
+        <fieldset>
+          <legend>发现范围</legend>
+          <div class="row">
+            <div class="col">
+              <label for="oSub">目标社区（sub，不含 r/）</label>
+              <input type="text" id="oSub" placeholder="如 AmazonSeller">
+            </div>
+            <div class="col">
+              <label for="oKeywords">标题关键词（逗号分隔）</label>
+              <input type="text" id="oKeywords" placeholder="startup,founder,help">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label for="oTemplate">私信模板（支持 {username} {post_title} {comment_snippet} {sub}）</label>
+              <textarea id="oTemplate" placeholder="Hi {username}, saw your comment on {post_title}: …">Hi {username}, I saw your comment on {post_title} and it made me think you might know something about this. Would you be open to a quick chat?</textarea>
+            </div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>风控参数</legend>
+          <div class="row">
+            <div class="col">
+              <label for="oRunLimit">单次执行数量上限</label>
+              <input type="number" id="oRunLimit" value="20" min="1" max="200">
+            </div>
+            <div class="col">
+              <label for="oSendMin">间隔最短（秒）</label>
+              <input type="number" id="oSendMin" value="60" min="5" max="600">
+            </div>
+            <div class="col">
+              <label for="oSendMax">间隔最长（秒）</label>
+              <input type="number" id="oSendMax" value="120" min="5" max="600">
+            </div>
+            <div class="col">
+              <label for="oCommentHours">评论时间窗（小时）</label>
+              <input type="number" id="oCommentHours" value="168" min="1" max="720">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label for="oMaxPosts">扫描帖子数</label>
+              <input type="number" id="oMaxPosts" value="100" min="1" max="500">
+            </div>
+            <div class="col">
+              <label for="oMaxComments">每帖评论数</label>
+              <input type="number" id="oMaxComments" value="50" min="1" max="1000">
+            </div>
+            <div class="col">
+              <label for="oMinScore">评论最低分</label>
+              <input type="number" id="oMinScore" value="1" min="0" max="1000">
+            </div>
+          </div>
+          <div class="notice">
+            全自动发送：discover 找到的评论者全部进入队列（仅硬排除帖主/版主/机器人/已联系），
+            send 按风控参数限频自动逐条发送。发送目标账号沿用上方「目标账号」配置。
+          </div>
+        </fieldset>
+        <div class="outreach-actions">
+          <button type="button" class="btn-outreach primary" id="btnODiscover" onclick="runOutreachDiscover()">① 发现评论者并入队</button>
+          <button type="button" class="btn-outreach primary" id="btnOSend" onclick="runOutreachSend()">② 全自动发送 pending</button>
+          <button type="button" class="btn-outreach stop" id="btnOStop" onclick="stopOutreach()">⏹ 停止</button>
+          <button type="button" class="btn-outreach" onclick="refreshOutreach()">刷新</button>
+        </div>
+        <div class="hint outreach-status-line" id="oStatus">等待操作…</div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>候选队列与发送记录 <small>只读</small></h2>
+      <div class="panel-body">
+        <div class="stats" style="grid-template-columns:repeat(5,1fr)">
+          <div class="stat"><div class="v" id="oqTotal">0</div><div class="k">总候选</div></div>
+          <div class="stat"><div class="v" id="oqPending">0</div><div class="k">待发送</div></div>
+          <div class="stat"><div class="v" id="oqSent">0</div><div class="k">已发送</div></div>
+          <div class="stat"><div class="v" id="oqFailed">0</div><div class="k">失败</div></div>
+          <div class="stat"><div class="v" id="oqSkipped">0</div><div class="k">跳过</div></div>
+        </div>
+        <div class="queue-scroll">
+          <table class="queue-table">
+            <thead><tr><th>状态</th><th>用户</th><th>来源帖子</th><th>草稿摘要</th><th>时间</th></tr></thead>
+            <tbody id="oQueueBody"><tr><td colspan="5" style="color:var(--faint)">暂无数据，先运行 discover</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -381,6 +704,26 @@
       if (!$('postSubs').value) $('postSubs').placeholder = d.subs.slice(0, 8).join(',');
     }
   }).catch(() => {});
+
+  // 私信触达：社区关键词预置自动填充（oKeywords 为空时按社区推荐）
+  let outreachPresets = {};
+  let lastPresetValue = '';
+  function applyOutreachPreset() {
+    const key = $('oSub').value.trim().toLowerCase().replace(/^r\//, '');
+    const current = $('oKeywords').value.trim();
+    if (!key || !outreachPresets[key]) return;
+    // 仅覆盖空值或上一次自动填入的值，不覆盖用户手动编辑的关键词
+    if (!current || current === lastPresetValue) {
+      lastPresetValue = outreachPresets[key].join(',');
+      $('oKeywords').value = lastPresetValue;
+    }
+  }
+  fetch('/api/outreach/presets').then((r) => r.json()).then((d) => {
+    outreachPresets = (d && d.presets) || {};
+    applyOutreachPreset();
+  }).catch(() => {});
+  $('oSub').addEventListener('input', applyOutreachPreset);
+  $('oSub').addEventListener('change', applyOutreachPreset);
 
   function collectConfig() {
     const num = (id, dft) => {
@@ -542,6 +885,129 @@
     await fetch('/api/stop', { method: 'POST' });
   };
 
+  // ==================== 私信触达（Outreach）====================
+  function collectOutreachConfig() {
+    const num = (id, dft) => {
+      const v = Number($(id).value);
+      return Number.isFinite(v) ? v : dft;
+    };
+    const list = (id) => $(id).value.split(/[,，\n]/).map((s) => s.trim()).filter(Boolean);
+    return {
+      target: { type: $('targetType').value, value: $('targetValue').value.trim() },
+      sub: $('oSub').value.trim(),
+      keywords: list('oKeywords'),
+      template: $('oTemplate').value,
+      runLimit: num('oRunLimit', 20),
+      sendIntervalMin: num('oSendMin', 60),
+      sendIntervalMax: num('oSendMax', 120),
+      commentHours: num('oCommentHours', 48),
+      maxPosts: num('oMaxPosts', 100),
+      maxCommentsPerPost: num('oMaxComments', 50),
+      minScore: num('oMinScore', 1),
+    };
+  }
+
+  const oStatusEl = () => $('oStatus');
+  function setOStatus(text, cls) {
+    const el = oStatusEl();
+    el.textContent = text;
+    el.className = 'hint ' + (cls || '');
+  }
+
+  window.runOutreachDiscover = async function () {
+    let cfg;
+    try { cfg = collectOutreachConfig(); } catch (error) { setOStatus('配置错误：' + error.message, 'err'); return; }
+    if (!cfg.target.value) { setOStatus('请先在上方「目标账号」填写发送账号', 'err'); return; }
+    if (!cfg.sub) { setOStatus('请填写目标社区（sub）', 'err'); return; }
+    if (!cfg.keywords.length) { setOStatus('请至少填写一个标题关键词', 'err'); return; }
+    if (!cfg.template.includes('{username}')) { setOStatus('模板必须包含 {username}', 'err'); return; }
+    const res = await fetch('/api/outreach/discover', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg),
+    });
+    const data = await res.json();
+    if (!res.ok) { setOStatus('发现失败：' + (data.error || res.status), 'err'); return; }
+    setOStatus(`发现任务已启动（pid ${data.pid}），完成后自动入队…`);
+    setTimeout(refreshOutreach, 1500);
+  };
+
+  window.runOutreachSend = async function () {
+    let cfg;
+    try { cfg = collectOutreachConfig(); } catch (error) { setOStatus('配置错误：' + error.message, 'err'); return; }
+    if (!cfg.target.value) { setOStatus('请先在上方「目标账号」填写发送账号', 'err'); return; }
+    if (!cfg.sub) { setOStatus('请填写目标社区（sub）', 'err'); return; }
+    const res = await fetch('/api/outreach/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg),
+    });
+    const data = await res.json();
+    if (!res.ok) { setOStatus('发送启动失败：' + (data.error || res.status), 'err'); return; }
+    setOStatus(`全自动发送已启动（pid ${data.pid}），按风控节奏逐条发送…`);
+    setTimeout(refreshOutreach, 1500);
+  };
+
+  window.stopOutreach = async function () {
+    if (!confirm('确定停止当前 outreach 任务？')) return;
+    await fetch('/api/outreach/stop', { method: 'POST' });
+    setOStatus('已请求停止');
+  };
+
+  window.refreshOutreach = async function () {
+    try {
+      const [stRes, qRes] = await Promise.all([
+        fetch('/api/outreach/status'),
+        fetch('/api/outreach/queue?status=all'),
+      ]);
+      const st = await stRes.json();
+      const q = await qRes.json();
+      // 运行状态徽标
+      const badge = $('outreachRunBadge');
+      if (st.running) {
+        badge.textContent = `${st.kind} 运行中`;
+        badge.className = 'badge online';
+      } else if (st.exitCode != null) {
+        badge.textContent = `已结束（${st.exitCode}）`;
+        badge.className = 'badge ' + (st.exitCode === 0 ? 'online' : 'err');
+      } else {
+        badge.textContent = '空闲';
+        badge.className = 'badge';
+      }
+      // 每日额度
+      const stats = st.queue || {};
+      $('outreachDaily').textContent = `本次最多发送 ${$('oRunLimit').value || 20} 条，剩余队列 ${stats.pending || 0} 条`;
+      // 统计卡
+      $('oqTotal').textContent = stats.total || 0;
+      $('oqPending').textContent = stats.pending || 0;
+      $('oqSent').textContent = stats.sent || 0;
+      $('oqFailed').textContent = stats.failed || 0;
+      $('oqSkipped').textContent = stats.skipped || 0;
+      // 队列表格
+      const tbody = $('oQueueBody');
+      const items = (q.items || []).slice(0, 50);
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--faint)">暂无数据，先运行 discover</td></tr>';
+      } else {
+        tbody.innerHTML = items.map((item) => {
+          const draft = (item.draft || '').slice(0, 60);
+          const time = item.sentAt || item.createdAt || '';
+          return `<tr>
+            <td><span class="q-status ${item.status}">${item.status}</span></td>
+            <td class="mono"><strong>${escapeHtml(item.username)}</strong></td>
+            <td>${escapeHtml(item.postTitle || '')}</td>
+            <td><span title="${escapeHtml(item.draft || '')}">${escapeHtml(draft)}</span></td>
+            <td class="mono">${time ? new Date(time).toLocaleString('zh-CN', { hour12: false }) : '-'}</td>
+          </tr>`;
+        }).join('');
+      }
+    } catch {
+      // 服务不可达时静默
+    }
+  };
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
   // 状态轮询
   async function pollStatus() {
     try {
@@ -627,8 +1093,10 @@
 
   setInterval(pollStatus, 2000);
   setInterval(pollLogs, 1500);
+  setInterval(refreshOutreach, 3000);
   pollStatus();
   pollLogs();
+  refreshOutreach();
 })();
 </script>
 </body>

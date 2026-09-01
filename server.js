@@ -225,6 +225,129 @@ function stopJob() {
   return { ok: true };
 }
 
+// ==================== 私信触达（Outreach）模块 ====================
+// 独立于养号 job 的 outreach job（discover / send 二选一运行），
+// 前后端通过 /api/outreach/* 交互；子进程 Stdout 协议与 runner 一致。
+
+const OUTREACH_DISCOVER = path.join(ROOT, 'lib', 'outreach', 'discover.js');
+const OUTREACH_SENDER = path.join(ROOT, 'lib', 'outreach', 'sender.js');
+const OUTREACH_QUEUE = path.join(ROOT, 'lib', 'outreach', 'queue.js');
+const { parseOutreachConfig, SUB_KEYWORD_PRESETS } = require(path.join(ROOT, 'lib', 'config'));
+const {
+  readQueue, listQueue, queueStats, dailySentCount, enqueueCandidates, STATUS,
+} = require(OUTREACH_QUEUE);
+
+let outreachJob = null; // { kind, child, startedAt, config, stopped, exitCode, stoppedBy }
+
+function outreachStatusPayload() {
+  return {
+    running: Boolean(outreachJob),
+    kind: outreachJob?.kind || null,
+    startedAt: outreachJob?.startedAt || null,
+    stopped: outreachJob?.stopped || false,
+    exitCode: outreachJob?.exitCode ?? null,
+    stoppedBy: outreachJob?.stoppedBy || null,
+    queue: queueStats(),
+    dailySent: dailySentCount(),
+  };
+}
+
+function writeTmpConfig(config) {
+  const tmpFile = path.join(os.tmpdir(), `reddit-outreach-${Date.now()}-${process.pid}.json`);
+  fs.writeFileSync(tmpFile, JSON.stringify(config, null, 2), 'utf8');
+  return tmpFile;
+}
+
+function stopOutreachJob() {
+  if (!outreachJob || outreachJob.stopped) return { ok: false, error: '当前没有运行中的 outreach 任务' };
+  outreachJob.stopped = true;
+  outreachJob.stoppedBy = 'user';
+  appendLog('[server] 收到 outreach 停止请求，发送 SIGTERM...', { level: 'warn', event: 'outreach.stop_requested', kind: outreachJob.kind, pid: outreachJob.child.pid });
+  try { outreachJob.child.kill('SIGTERM'); } catch { /* ignore */ }
+  return { ok: true };
+}
+
+/**
+ * 启动 outreach 子进程（discover 或 sender），接入现有日志体系。
+ * discover 子进程结尾写一行 JSON 结果到 stdout，此处捕获用于入队/回显。
+ */
+function startOutreach(kind, config) {
+  if (outreachJob) return { ok: false, code: 409, error: '已有 outreach 任务在运行，请先停止' };
+  if (job) return { ok: false, code: 409, error: '养号任务运行中，不能同时启动 outreach（互斥锁语义）' };
+  const script = kind === 'discover' ? OUTREACH_DISCOVER : OUTREACH_SENDER;
+  const tmpFile = writeTmpConfig(config);
+
+  const child = spawn(process.execPath, [script, '--config', tmpFile], {
+    cwd: ROOT,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const startedAt = new Date();
+  const runId = `${startedAt.toISOString().replace(/\D/g, '').slice(0, 14)}-${child.pid}`;
+  outreachJob = { kind, child, startedAt, runId, config, stopped: false, exitCode: null, stoppedBy: null, tmpFile };
+
+  appendLog(`[server] outreach ${kind} 任务已启动 ${startedAt.toLocaleString('zh-CN')} (pid ${child.pid})`, { event: 'outreach.started', kind, runId, pid: child.pid });
+
+  // discover：捕获 stdout 里的 JSON 结果行（@@OUTREACH_JSON@@ + JSON），用于入队
+  const stdoutLines = createLineBuffer((line) => {
+    if (!line.trim()) return;
+    if (line.startsWith('@@OUTREACH_JSON@@')) {
+      try {
+        const payload = JSON.parse(line.slice('@@OUTREACH_JSON@@'.length));
+        outreachJob.lastResult = payload;
+        if (payload && payload.ok && Array.isArray(payload.candidates)) {
+          const enqueued = enqueueCandidates(payload.candidates, {
+            template: config.template || '',
+            sub: config.sub || '',
+          });
+          outreachJob.enqueueSummary = enqueued;
+          appendLog(`[server] discover 完成，入队 ${enqueued.added} 条候选，拒绝 ${enqueued.rejected.length} 条`, {
+            event: 'outreach.discover_enqueued', runId, added: enqueued.added, rejected: enqueued.rejected.length,
+          });
+        }
+      } catch (error) {
+        appendLog(`[server] outreach JSON 结果解析失败: ${error.message}`, { level: 'warn', event: 'outreach.result_parse_error', runId });
+      }
+      return;
+    }
+    appendLog(line, { source: 'outreach', event: line.startsWith('@@STATUS@@') ? 'outreach.status' : 'outreach.output', runId });
+  });
+  const stderrLines = createLineBuffer((line) => {
+    if (!line.trim()) return;
+    const parsed = parseStructuredLogLine(line, 'error');
+    appendLog(`[outreach stderr] ${line}`, { level: parsed.level, source: 'outreach', event: parsed.event || 'outreach.stderr', runId, stream: 'stderr' });
+  });
+  child.stdout.on('data', (chunk) => stdoutLines.push(chunk));
+  child.stderr.on('data', (chunk) => stderrLines.push(chunk));
+  child.on('error', (error) => {
+    appendLog(`[server] outreach 子进程启动失败: ${error.message}`, { level: 'error', event: 'outreach.spawn_error', runId, error: { message: error.message, code: error.code } });
+  });
+  child.on('close', (code, signal) => {
+    stdoutLines.flush();
+    stderrLines.flush();
+    const exitCode = code == null ? 'signal' : code;
+    outreachJob.exitCode = exitCode;
+    appendLog(`[server] outreach ${kind} 结束，退出码 ${exitCode}`, { level: exitCode === 0 ? 'info' : 'warn', event: 'outreach.finished', kind, runId, exitCode, signal: signal || null });
+    if (outreachJob?.tmpFile) {
+      try { fs.unlinkSync(outreachJob.tmpFile); } catch { /* ignore */ }
+    }
+    outreachJob = null;
+  });
+  return { ok: true, startedAt, pid: child.pid, runId };
+}
+
+// ---- 审计报告读取 ----
+function readOutreachReport(dateStr) {
+  const date = dateStr || new Date().toISOString().slice(0, 10);
+  const file = path.join(ROOT, 'logs', `outreach-${date}.jsonl`);
+  if (!fs.existsSync(file)) return { date, entries: [] };
+  const entries = [];
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    try { entries.push(JSON.parse(line)); } catch { /* 跳过损坏行 */ }
+  }
+  return { date, entries };
+}
+
 // ---- 路由 ----
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -248,6 +371,52 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && pathname === '/api/subs') {
       return json(res, 200, { subs: loadSubPool(), mode: ['specified', 'random'] });
+    }
+    if (req.method === 'GET' && pathname === '/api/outreach/presets') {
+      return json(res, 200, { presets: SUB_KEYWORD_PRESETS });
+    }
+    if (req.method === 'GET' && pathname === '/api/outreach/status') {
+      return json(res, 200, outreachStatusPayload());
+    }
+    if (req.method === 'GET' && pathname === '/api/outreach/queue') {
+      const status = url.searchParams.get('status') || null;
+      const items = listQueue({ status: status === 'all' || !status ? null : status, limit: 500 });
+      return json(res, 200, { items, stats: queueStats(), dailySent: dailySentCount() });
+    }
+    if (req.method === 'GET' && pathname === '/api/outreach/report') {
+      return json(res, 200, readOutreachReport(url.searchParams.get('date') || undefined));
+    }
+    if (req.method === 'POST' && pathname === '/api/outreach/discover') {
+      const body = await readBody(req);
+      let config;
+      try {
+        config = parseOutreachConfig(body);
+      } catch (error) {
+        return json(res, 400, { error: error.message });
+      }
+      const result = startOutreach('discover', config);
+      if (!result.ok) return json(res, result.code || 400, result);
+      return json(res, 200, result);
+    }
+    if (req.method === 'POST' && pathname === '/api/outreach/send') {
+      const body = await readBody(req);
+      let config;
+      try {
+        config = parseOutreachConfig(body);
+      } catch (error) {
+        return json(res, 400, { error: error.message });
+      }
+      // 发送前置检查：队列里必须有 pending
+      const pendingCount = listQueue({ status: STATUS.PENDING }).length;
+      if (pendingCount === 0) {
+        return json(res, 400, { error: '队列中没有待发送（pending）候选，请先运行 discover' });
+      }
+      const result = startOutreach('sender', config);
+      if (!result.ok) return json(res, result.code || 400, result);
+      return json(res, 200, result);
+    }
+    if (req.method === 'POST' && pathname === '/api/outreach/stop') {
+      return json(res, 200, stopOutreachJob());
     }
     if (req.method === 'POST' && pathname === '/api/rules') {
       if (job) return json(res, 409, { error: '养号任务运行中，不能同时读取规则' });
