@@ -451,6 +451,62 @@
     .view-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
     .layout > .panel:first-child, .layout > .monitor { max-width: none; }
   }
+
+  /* ---- 紧凑化排版覆盖层（仅样式精简，功能与 DOM 结构不变） ---- */
+  :root { --sidebar-width: 204px; }
+  body { font-size: 13px; }
+  header { min-height: 56px; gap: 12px; padding: 8px max(20px, calc((100vw - 1560px) / 2)); }
+  .brand-mark { width: 30px; height: 30px; border-radius: 7px; font-size: 15px; }
+  header h1 { font-size: 15px; }
+  .brand-subtitle { font-size: 10px; margin-top: 1px; }
+  header .badge { font-size: 10px; padding: 3px 8px; }
+  header .status-run { min-width: 94px; padding: 6px 9px; font-size: 11px; }
+  .section-nav { padding: 14px 10px 20px; gap: 2px; }
+  .section-nav::before { padding-bottom: 8px; }
+  .section-nav a { padding: 7px 10px; font-size: 11.5px; }
+  .layout { padding: 14px 20px 26px; gap: 14px; }
+  .monitor { top: 78px; }
+  .panel { border-radius: 7px; }
+  .panel > h2 { padding: 9px 12px; }
+  .panel-body { padding: 12px; }
+  fieldset { padding: 13px; margin-bottom: 10px; border-radius: 6px; scroll-margin-top: 84px; }
+  legend { font-size: 11px; }
+  .row { gap: 10px; margin-bottom: 10px; }
+  label { margin-bottom: 4px; }
+  input[type="text"], input[type="number"], select, textarea { min-height: 31px; padding: 5px 8px; font-size: 11.5px; }
+  textarea { min-height: 52px; }
+  .hint { margin-top: 3px; line-height: 1.5; }
+  .toggle { padding: 5px 0; gap: 7px; }
+  button { min-height: 31px; padding: 5px 10px; font-size: 11.5px; }
+  .actions { padding: 8px 0; gap: 8px; }
+  .stats { gap: 7px; margin-bottom: 10px; }
+  .stat { padding: 9px 8px 8px; }
+  .stat .v { font-size: 19px; }
+  .stat .k { margin-top: 5px; }
+  #log { padding: 10px; font-size: 10.5px; height: calc(100vh - 190px); min-height: 380px; }
+  .view-heading { margin: 14px 0 10px; }
+  .view-heading h2 { font-size: 17px; }
+  .view-heading p { font-size: 11px; margin-top: 2px; }
+  .outreach-bar { min-height: 42px; margin: 0 0 12px; }
+  .outreach-grid { gap: 14px; }
+  .outreach-grid > .panel:first-child .panel-body,
+  .outreach-grid > .panel:last-child .panel-body { padding: 14px; }
+  .outreach-grid fieldset { padding: 14px; margin-bottom: 12px; }
+  .outreach-grid fieldset:last-of-type { margin-bottom: 0; }
+  .btn-outreach, .kb-toolbar button, .kb-toolbar input { min-height: 33px; }
+  .queue-scroll { max-height: 380px; }
+  .queue-table th, .queue-table td { padding: 5px 8px; }
+  .kb-table th, .kb-table td { padding: 6px 8px; }
+  .kb-actions button { min-height: 25px; padding: 3px 7px; }
+  .kb-content { max-width: 360px; }
+  .notice { padding: 8px 10px; }
+  @media (max-width: 1120px) {
+    .monitor { top: 64px; }
+  }
+  @media (max-width: 900px) {
+    .section-nav { top: 56px; }
+    .section-nav a { padding: 7px 9px; }
+  }
 </style>
 </head>
 <body>
