@@ -8,16 +8,28 @@ Single-node RAG API for RedWarm. Qdrant stores vectors; the existing JSON file r
 go run .
 ```
 
+For the complete single-machine stack (Qdrant + Ollama + this service):
+
+```bash
+docker compose -f docker-compose.rag.yml up -d qdrant ollama
+docker compose -f docker-compose.rag.yml exec ollama ollama pull bge-m3
+# start the API after the embedding model is available
+docker compose -f docker-compose.rag.yml up -d --build redwarm-rag
+```
+
+On a host installation with Ollama already running, `go run .` uses the local `bge-m3:latest` model by default.
+
 Environment variables:
 
 - `RAG_ADDR` (default `:8090`)
 - `QDRANT_URL` (default `http://127.0.0.1:6333`)
 - `QDRANT_COLLECTION` (default `redwarm_knowledge`)
 - `KB_SOURCE` (default `../state/outreach-kb.json`)
-- `EMBEDDING_BASE_URL` (default `https://api.openai.com/v1`)
-- `EMBEDDING_MODEL` (default `text-embedding-3-small`)
-- `EMBEDDING_API_KEY` (required for `/api/kb/sync` and `/api/kb/search`)
-- `EMBEDDING_DIM` (default `1536`; must match the selected embedding model)
+- `EMBEDDING_PROVIDER` (default `ollama`; set `openai` for OpenAI-compatible APIs)
+- `EMBEDDING_BASE_URL` (default `http://127.0.0.1:11434`; OpenAI example: `https://api.openai.com/v1`)
+- `EMBEDDING_MODEL` (default `bge-m3:latest`)
+- `EMBEDDING_API_KEY` (required only when `EMBEDDING_PROVIDER=openai`)
+- `EMBEDDING_DIM` (default `1024`; `bge-m3` uses 1024; must match the selected model)
 
 ## API
 

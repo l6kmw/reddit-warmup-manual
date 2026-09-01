@@ -17,14 +17,15 @@ import (
 )
 
 type Config struct {
-	Addr             string
-	QdrantURL        string
-	Collection       string
-	KBSource         string
-	EmbeddingBaseURL string
-	EmbeddingModel   string
-	EmbeddingAPIKey  string
-	EmbeddingDim     int
+	Addr              string
+	QdrantURL         string
+	Collection        string
+	KBSource          string
+	EmbeddingBaseURL  string
+	EmbeddingModel    string
+	EmbeddingAPIKey   string
+	EmbeddingProvider string
+	EmbeddingDim      int
 }
 
 type KB struct {
@@ -67,19 +68,20 @@ func env(key, fallback string) string {
 }
 
 func loadConfig() (Config, error) {
-	dim, err := strconv.Atoi(env("EMBEDDING_DIM", "1536"))
+	dim, err := strconv.Atoi(env("EMBEDDING_DIM", "1024"))
 	if err != nil || dim <= 0 {
 		return Config{}, errors.New("EMBEDDING_DIM must be a positive integer")
 	}
 	return Config{
-		Addr:             env("RAG_ADDR", ":8090"),
-		QdrantURL:        strings.TrimRight(env("QDRANT_URL", "http://127.0.0.1:6333"), "/"),
-		Collection:       env("QDRANT_COLLECTION", "redwarm_knowledge"),
-		KBSource:         env("KB_SOURCE", "../state/outreach-kb.json"),
-		EmbeddingBaseURL: strings.TrimRight(env("EMBEDDING_BASE_URL", "https://api.openai.com/v1"), "/"),
-		EmbeddingModel:   env("EMBEDDING_MODEL", "text-embedding-3-small"),
-		EmbeddingAPIKey:  strings.TrimSpace(os.Getenv("EMBEDDING_API_KEY")),
-		EmbeddingDim:     dim,
+		Addr:              env("RAG_ADDR", ":8090"),
+		QdrantURL:         strings.TrimRight(env("QDRANT_URL", "http://127.0.0.1:6333"), "/"),
+		Collection:        env("QDRANT_COLLECTION", "redwarm_knowledge"),
+		KBSource:          env("KB_SOURCE", "../state/outreach-kb.json"),
+		EmbeddingBaseURL:  strings.TrimRight(env("EMBEDDING_BASE_URL", "http://127.0.0.1:11434"), "/"),
+		EmbeddingModel:    env("EMBEDDING_MODEL", "bge-m3:latest"),
+		EmbeddingAPIKey:   strings.TrimSpace(os.Getenv("EMBEDDING_API_KEY")),
+		EmbeddingProvider: strings.ToLower(env("EMBEDDING_PROVIDER", "ollama")),
+		EmbeddingDim:      dim,
 	}, nil
 }
 
@@ -175,32 +177,48 @@ func itemText(item KBItem) string {
 }
 
 func (a *App) embed(inputs []string) ([][]float32, error) {
-	if a.cfg.EmbeddingAPIKey == "" {
-		return nil, errors.New("EMBEDDING_API_KEY is not configured")
+	if len(inputs) == 0 {
+		return [][]float32{}, nil
 	}
-	request := map[string]interface{}{"model": a.cfg.EmbeddingModel, "input": inputs}
-	var response struct {
-		Data []struct {
-			Index     int       `json:"index"`
-			Embedding []float32 `json:"embedding"`
-		} `json:"data"`
+	var vectors [][]float32
+	var err error
+	if a.cfg.EmbeddingProvider == "ollama" {
+		request := map[string]interface{}{"model": a.cfg.EmbeddingModel, "input": inputs}
+		var response struct {
+			Embeddings [][]float32 `json:"embeddings"`
+		}
+		err = a.doJSON(http.MethodPost, a.cfg.EmbeddingBaseURL+"/api/embed", request, &response, nil)
+		vectors = response.Embeddings
+	} else {
+		if a.cfg.EmbeddingAPIKey == "" {
+			return nil, errors.New("EMBEDDING_API_KEY is not configured")
+		}
+		request := map[string]interface{}{"model": a.cfg.EmbeddingModel, "input": inputs}
+		var response struct {
+			Data []struct {
+				Index     int       `json:"index"`
+				Embedding []float32 `json:"embedding"`
+			} `json:"data"`
+		}
+		err = a.doJSON(http.MethodPost, a.cfg.EmbeddingBaseURL+"/embeddings", request, &response, map[string]string{"Authorization": "Bearer " + a.cfg.EmbeddingAPIKey})
+		vectors = make([][]float32, len(inputs))
+		for _, row := range response.Data {
+			if row.Index < 0 || row.Index >= len(vectors) {
+				return nil, errors.New("embedding response has invalid index")
+			}
+			vectors[row.Index] = row.Embedding
+		}
 	}
-	err := a.doJSON(http.MethodPost, a.cfg.EmbeddingBaseURL+"/embeddings", request, &response, map[string]string{"Authorization": "Bearer " + a.cfg.EmbeddingAPIKey})
 	if err != nil {
 		return nil, err
 	}
-	if len(response.Data) != len(inputs) {
-		return nil, fmt.Errorf("embedding response count %d, expected %d", len(response.Data), len(inputs))
+	if len(vectors) != len(inputs) {
+		return nil, fmt.Errorf("embedding response count %d, expected %d", len(vectors), len(inputs))
 	}
-	vectors := make([][]float32, len(inputs))
-	for _, row := range response.Data {
-		if row.Index < 0 || row.Index >= len(vectors) {
-			return nil, errors.New("embedding response has invalid index")
+	for _, vector := range vectors {
+		if len(vector) != a.cfg.EmbeddingDim {
+			return nil, fmt.Errorf("embedding dimension %d, expected %d", len(vector), a.cfg.EmbeddingDim)
 		}
-		if len(row.Embedding) != a.cfg.EmbeddingDim {
-			return nil, fmt.Errorf("embedding dimension %d, expected %d", len(row.Embedding), a.cfg.EmbeddingDim)
-		}
-		vectors[row.Index] = row.Embedding
 	}
 	return vectors, nil
 }

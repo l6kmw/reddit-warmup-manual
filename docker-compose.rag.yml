@@ -12,6 +12,7 @@ services:
     restart: unless-stopped
     depends_on:
       - qdrant
+      - ollama
     ports:
       - "8090:8090"
     environment:
@@ -19,9 +20,15 @@ services:
       QDRANT_URL: "http://qdrant:6333"
       QDRANT_COLLECTION: "redwarm_knowledge"
       KB_SOURCE: "/app/state/outreach-kb.json"
-      EMBEDDING_BASE_URL: "${EMBEDDING_BASE_URL:-https://api.openai.com/v1}"
-      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
-      EMBEDDING_DIM: "${EMBEDDING_DIM:-1536}"
-      EMBEDDING_API_KEY: "${EMBEDDING_API_KEY}"
+      EMBEDDING_PROVIDER: "ollama"
+      EMBEDDING_BASE_URL: "http://ollama:11434"
+      EMBEDDING_MODEL: "bge-m3:latest"
+      EMBEDDING_DIM: "1024"
     volumes:
       - ./state:/app/state:ro
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ./data/ollama:/root/.ollama
