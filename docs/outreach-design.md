@@ -107,7 +107,8 @@ New 排序 limit100     近48h/分数≥1       OP/版主/机器人/已联系
 - **收信轮询**：`lib/outreach/inbox.js` —— Matrix sync 增量检测新回复（幂等：以 replyHistory 最后时间戳为准，
   处理失败不重扫、成功入历史后自然停）
 - **AI 生成**：`lib/outreach/ai-provider.js`（provider 抽象，v1 MockProvider + 规则策略 `reply-policy.js`；
-  寒暄/闲聊/致谢自动回，购买意向/投诉/辱骂/疑问/乱码转人工）
+  寒暄/闲聊/致谢自动回，购买意向/投诉/辱骂/疑问/乱码转人工；过短/无特征消息
+  也自动回（通用接话，不冷场）——2026-09-01 用户决策调整）
 - **回复器**：`lib/outreach/replier.js` —— 检测→生成→发送（Matrix 往已有 room，无 24h 建房限额）→ 审计；
   服务端 `server.js` 后台定时轮询（`/api/outreach/reply/start|stop|status`）+ 互斥锁
 - **线程发现**：Matrix `discoverThreads` + `resolveUsername`（sync displayname → members+profile → 消息体多源回退）

@@ -70,7 +70,7 @@ node lib/outreach/personalize.js --config /tmp/pers-cfg.json --apply --limit 20
   node lib/outreach/kb.js --add "标题|关键词1,关键词2|内容"
   node lib/outreach/kb.js --list | --search "词" | --del <id>
   ```
-- **回复策略**（`lib/outreach/reply-policy.js`）：寒暄 / 闲聊 / 致谢 → 自动回复；购买意向 / 投诉 / 辱骂 / 一般疑问 / 乱码 → `needs_human`（不自动回）
+- **回复策略**（`lib/outreach/reply-policy.js`）：寒暄 / 闲聊 / 致谢 → 自动回复；购买意向 / 投诉 / 辱骂 / 一般疑问 / 乱码 → `needs_human`（不自动回）；**过短/无特征消息（如 "you"、"hmm"）也自动回复**（通用接话，不冷场）
 - **轮询**：`POST /api/outreach/reply/start`（`{config:{target, provider}, intervalMs}`，默认 10 分钟一轮）；控制台「AI 客服回复」面板可启动/停止/查看状态；与发送/养号共用互斥锁
 - **手动跑一轮**：
   ```bash
