@@ -522,11 +522,7 @@
 
 <nav class="section-nav" aria-label="功能模块">
   <a href="#overview">总览</a>
-  <a href="#targetSection">账号目标</a>
-  <a href="#communitySection">社区规则</a>
-  <a href="#behaviorSection">行为策略</a>
-  <a href="#publishSection">发帖门控</a>
-  <a href="#advancedSection">高级设置</a>
+  <a href="#warmupView">养号配置</a>
   <a href="#outreachSection">私信触达</a>
   <a href="#queueView">发送队列</a>
   <a href="#replyView">AI 客服</a>
@@ -541,7 +537,7 @@
 <div class="layout">
   <!-- 左：参数表单 -->
   <div class="panel">
-    <h2>养号参数</h2>
+    <h2>养号配置 <small>目标账号 · 社区 · 行为 · 发帖 · 高级</small></h2>
     <div class="panel-body">
 
       <fieldset id="targetSection">
@@ -1404,11 +1400,12 @@
   $('kbModal').addEventListener('click', (event) => { if (event.target === $('kbModal')) closeKbEditor(); });
   refreshKb();
 
-  // 独立模块视图：每个 hash 只展示一个工作界面，保留原有表单逻辑与 API。
+  // 独立模块视图：每个 hash 展示一个功能模块；养号相关配置全部集中在同一视图。
   function setModuleView() {
     const route = (location.hash || '#overview').slice(1);
-    const warmupSections = ['targetSection', 'communitySection', 'behaviorSection', 'publishSection', 'advancedSection'];
-    const section = $(route);
+    // 旧拆分路由别名：统一归入「养号配置」视图
+    const warmupAliases = ['targetSection', 'communitySection', 'behaviorSection', 'publishSection', 'advancedSection'];
+    const resolved = warmupAliases.includes(route) ? 'warmupView' : route;
     const layout = document.querySelector('.layout');
     const outreach = $('outreachSection');
     const configPanel = outreach ? outreach.querySelector('.outreach-grid > .panel:first-child') : null;
@@ -1420,31 +1417,36 @@
     if (layout) layout.classList.add('view-hidden');
     if (outreach) outreach.classList.add('view-hidden');
     for (const panel of Object.values(moduleMap)) if (panel) panel.classList.add('view-hidden');
-    if (route === 'overview') {
+    if (resolved === 'overview') {
       if ($('overview')) $('overview').classList.remove('view-hidden');
       if (layout) layout.classList.remove('view-hidden');
       if (outreach) outreach.classList.remove('view-hidden');
-    } else if (warmupSections.includes(route)) {
+    } else if (resolved === 'warmupView') {
+      // 养号配置：目标账号/社区/行为/发帖/高级 全部集中同屏展示
       if (layout) layout.classList.remove('view-hidden');
-      for (const field of warmupSections) if ($(field)) $(field).classList.toggle('view-hidden', field !== route);
       if (layout) layout.classList.add('view-enter');
-    } else if (route === 'logsView') {
+    } else if (resolved === 'logsView') {
       if (layout) layout.classList.remove('view-hidden');
       const formPanel = layout && layout.querySelector(':scope > .panel:first-child');
       if (formPanel) formPanel.classList.add('view-hidden');
       if ($('logsView')) $('logsView').classList.remove('view-hidden');
-    } else if (route === 'outreachSection' || route === 'queueView' || route === 'replyView' || route === 'kbSection') {
+    } else if (resolved === 'outreachSection' || resolved === 'queueView' || resolved === 'replyView' || resolved === 'kbSection') {
       if (outreach) outreach.classList.remove('view-hidden');
-      if (route === 'outreachSection' && configPanel) configPanel.classList.remove('view-hidden');
-      if (route === 'queueView' && $('queueView')) $('queueView').classList.remove('view-hidden');
-      if (route === 'replyView' && $('replyView')) $('replyView').classList.remove('view-hidden');
-      if (route === 'kbSection' && $('kbSection')) $('kbSection').classList.remove('view-hidden');
+      if (resolved === 'outreachSection' && configPanel) configPanel.classList.remove('view-hidden');
+      if (resolved === 'queueView' && $('queueView')) $('queueView').classList.remove('view-hidden');
+      if (resolved === 'replyView' && $('replyView')) $('replyView').classList.remove('view-hidden');
+      if (resolved === 'kbSection' && $('kbSection')) $('kbSection').classList.remove('view-hidden');
       if (outreach) outreach.classList.add('view-enter');
     } else {
-      location.hash = '#overview';
+      location.hash = '#warmupView';
       return;
     }
-    document.querySelectorAll('.section-nav a').forEach((link) => link.classList.toggle('active', link.getAttribute('href') === `#${route}`));
+    const activeTarget = resolved === 'overview' ? '#overview' : `#${resolved}`;
+    document.querySelectorAll('.section-nav a').forEach((link) => {
+      const href = link.getAttribute('href');
+      const linkKey = warmupAliases.includes(href.slice(1)) ? '#warmupView' : href;
+      link.classList.toggle('active', linkKey === activeTarget);
+    });
   }
   window.addEventListener('hashchange', setModuleView);
   setModuleView();
