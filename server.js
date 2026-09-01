@@ -231,6 +231,7 @@ function stopJob() {
 
 const OUTREACH_DISCOVER = path.join(ROOT, 'lib', 'outreach', 'discover.js');
 const OUTREACH_SENDER = path.join(ROOT, 'lib', 'outreach', 'sender.js');
+const OUTREACH_REPLIER = path.join(ROOT, 'lib', 'outreach', 'replier.js');
 const OUTREACH_QUEUE = path.join(ROOT, 'lib', 'outreach', 'queue.js');
 const { parseOutreachConfig, SUB_KEYWORD_PRESETS } = require(path.join(ROOT, 'lib', 'config'));
 const {
@@ -267,14 +268,90 @@ function stopOutreachJob() {
   return { ok: true };
 }
 
+// ==================== 后台客服回复调度（replier 定时轮询） ====================
+
+const DEFAULT_REPLY_INTERVAL_MS = 10 * 60 * 1000; // 默认 10 分钟
+let replyJob = null; // { config, intervalMs, timer, running, nextRunAt, startedAt, stopped, runCount, lastResult, lastError }
+
+function replyStatusPayload() {
+  return {
+    enabled: Boolean(replyJob && !replyJob.stopped),
+    running: Boolean(replyJob && replyJob.running),
+    intervalMs: replyJob?.intervalMs || null,
+    startedAt: replyJob?.startedAt || null,
+    stopped: Boolean(replyJob?.stopped),
+    nextRunAt: replyJob?.nextRunAt || null,
+    runCount: replyJob?.runCount || 0,
+    lastResult: replyJob?.lastResult || null,
+    lastError: replyJob?.lastError || null,
+  };
+}
+
+/** 立即跑一轮 replier 子进程（复用 startOutreach 槽位；被手动任务占用则跳过） */
+function runReplyRound(config) {
+  if (!replyJob || replyJob.stopped) return;
+  if (outreachJob) {
+    appendLog('[server] 有手动 outreach 任务在运行，客服回复本轮跳过', { level: 'info', event: 'reply.tick_skipped' });
+    replyJob.nextRunAt = Date.now() + (replyJob.intervalMs || DEFAULT_REPLY_INTERVAL_MS);
+    return;
+  }
+  const started = startOutreach('replier', config);
+  if (!started.ok) {
+    appendLog(`[server] 客服回复子进程启动失败: ${started.error}`, { level: 'warn', event: 'reply.spawn_fail' });
+    replyJob.nextRunAt = Date.now() + (replyJob.intervalMs || DEFAULT_REPLY_INTERVAL_MS);
+    return;
+  }
+  replyJob.running = true;
+  appendLog(`[server] 客服回复第 ${replyJob.runCount + 1} 轮开始 (pid ${started.pid})`, { event: 'reply.round_started', runCount: replyJob.runCount + 1, pid: started.pid });
+}
+
 /**
- * 启动 outreach 子进程（discover 或 sender），接入现有日志体系。
+ * 启动后台客服回复任务（定时轮询）。
+ * @param {object} config replier 配置（target/provider/maxReplies/dryRun）
+ * @param {number} intervalMs 轮询间隔（>=60000）
+ * @returns {{ok: boolean, error?: string, status?: object}}
+ */
+function startReplyJob(config, intervalMs) {
+  if (replyJob && !replyJob.stopped) return { ok: false, code: 409, error: '客服回复任务已在运行，请先停止' };
+  if (!config || !config.target || !config.target.type || !config.target.value) return { ok: false, error: '缺少 target' };
+  const interval = Number(intervalMs || DEFAULT_REPLY_INTERVAL_MS);
+  if (!Number.isFinite(interval) || interval < 60000) return { ok: false, error: 'intervalMs 必须 >= 60000' };
+
+  const timer = setInterval(() => {
+    if (!replyJob || replyJob.stopped) { clearInterval(timer); return; }
+    runReplyRound(replyJob.config);
+  }, interval);
+  if (timer.unref) timer.unref();
+
+  replyJob = { config, intervalMs: interval, timer, running: false, nextRunAt: Date.now() + interval, startedAt: new Date(), stopped: false, runCount: 0, lastResult: null, lastError: null };
+  appendLog(`[server] 客服回复后台任务已启动（间隔 ${Math.round(interval / 1000)}s）`, { event: 'reply.started', intervalMs: interval, target: config.target });
+  runReplyRound(config);
+  return { ok: true, status: replyStatusPayload() };
+}
+
+/** 停止后台客服回复任务 */
+function stopReplyJob() {
+  if (!replyJob) return { ok: false, error: '客服回复任务未启动' };
+  replyJob.stopped = true;
+  if (replyJob.timer) clearInterval(replyJob.timer);
+  if (replyJob.running) {
+    appendLog('[server] 收到客服回复停止请求，发送 SIGTERM...', { level: 'warn', event: 'reply.stop_requested' });
+    try { outreachJob?.child?.kill('SIGTERM'); } catch { /* ignore */ }
+  } else {
+    replyJob = null;
+  }
+  appendLog('[server] 客服回复后台任务已停止', { event: 'reply.stopped' });
+  return { ok: true };
+}
+
+/**
+ * 启动 outreach 子进程（discover / sender / replier），接入现有日志体系。
  * discover 子进程结尾写一行 JSON 结果到 stdout，此处捕获用于入队/回显。
  */
 function startOutreach(kind, config) {
   if (outreachJob) return { ok: false, code: 409, error: '已有 outreach 任务在运行，请先停止' };
   if (job) return { ok: false, code: 409, error: '养号任务运行中，不能同时启动 outreach（互斥锁语义）' };
-  const script = kind === 'discover' ? OUTREACH_DISCOVER : OUTREACH_SENDER;
+  const script = kind === 'discover' ? OUTREACH_DISCOVER : kind === 'replier' ? OUTREACH_REPLIER : OUTREACH_SENDER;
   const tmpFile = writeTmpConfig(config);
 
   const child = spawn(process.execPath, [script, '--config', tmpFile], {
@@ -326,11 +403,21 @@ function startOutreach(kind, config) {
     stderrLines.flush();
     const exitCode = code == null ? 'signal' : code;
     outreachJob.exitCode = exitCode;
+    const lastResult = outreachJob?.lastResult || null;
     appendLog(`[server] outreach ${kind} 结束，退出码 ${exitCode}`, { level: exitCode === 0 ? 'info' : 'warn', event: 'outreach.finished', kind, runId, exitCode, signal: signal || null });
     if (outreachJob?.tmpFile) {
       try { fs.unlinkSync(outreachJob.tmpFile); } catch { /* ignore */ }
     }
     outreachJob = null;
+    // 后台客服回复调度：一轮结束，更新状态并排定下一轮
+    if (kind === 'replier' && replyJob) {
+      replyJob.running = false;
+      replyJob.runCount += 1;
+      replyJob.lastResult = lastResult;
+      replyJob.lastError = exitCode === 0 ? null : `exit_${exitCode}`;
+      replyJob.nextRunAt = Date.now() + (replyJob.intervalMs || DEFAULT_REPLY_INTERVAL_MS);
+      appendLog(`[server] 客服回复第 ${replyJob.runCount} 轮完成（exit ${exitCode}）`, { level: exitCode === 0 ? 'info' : 'warn', event: 'reply.round_finished', runCount: replyJob.runCount, exitCode });
+    }
   });
   return { ok: true, startedAt, pid: child.pid, runId };
 }
@@ -417,6 +504,19 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && pathname === '/api/outreach/stop') {
       return json(res, 200, stopOutreachJob());
+    }
+    // 客服回复：后台定时任务 start/stop/status
+    if (req.method === 'GET' && pathname === '/api/outreach/reply/status') {
+      return json(res, 200, replyStatusPayload());
+    }
+    if (req.method === 'POST' && pathname === '/api/outreach/reply/start') {
+      const body = await readBody(req);
+      const result = startReplyJob(body.config, Number(body.intervalMs));
+      if (!result.ok) return json(res, result.code || 400, result);
+      return json(res, 200, result);
+    }
+    if (req.method === 'POST' && pathname === '/api/outreach/reply/stop') {
+      return json(res, 200, stopReplyJob());
     }
     if (req.method === 'POST' && pathname === '/api/rules') {
       if (job) return json(res, 409, { error: '养号任务运行中，不能同时读取规则' });

@@ -98,10 +98,21 @@ New 排序 limit100     近48h/分数≥1       OP/版主/机器人/已联系
 | `contactCooldownDays` | 30 | 同一用户两次联系最小间隔 |
 | `lockFile` | state/outreach.lock | 养号互斥锁 |
 
-## 7. 后续扩展预留（当前不做）
+## 7. 客服对话扩展（v1 已实现）
 
-- 客服回复：`state/outreach-contacted.json` 升级为会话表（contact 增加 `threadStatus/replyHistory/needsHuman` 字段即可，不破坏现有结构）
-- 自动应答：发送器之后增加收信轮询器（轮询消息/新回复），v1 不实现
+原预留的「客服回复 / 自动应答」已随 AI 客服功能落地：
+
+- **会话表**：`state/outreach-conversations.json`（兼容迁移自 `outreach-contacted.json`），每条会话记录
+  `{username, roomId, threadStatus(active|needs_human|closed), replyHistory[], needsHuman, needsHumanReason, lastCheckAt, context}`
+- **收信轮询**：`lib/outreach/inbox.js` —— Matrix sync 增量检测新回复（幂等：以 replyHistory 最后时间戳为准，
+  处理失败不重扫、成功入历史后自然停）
+- **AI 生成**：`lib/outreach/ai-provider.js`（provider 抽象，v1 MockProvider + 规则策略 `reply-policy.js`；
+  寒暄/闲聊/致谢自动回，购买意向/投诉/辱骂/疑问/乱码转人工）
+- **回复器**：`lib/outreach/replier.js` —— 检测→生成→发送（Matrix 往已有 room，无 24h 建房限额）→ 审计；
+  服务端 `server.js` 后台定时轮询（`/api/outreach/reply/start|stop|status`）+ 互斥锁
+- **线程发现**：Matrix `discoverThreads` + `resolveUsername`（sync displayname → members+profile → 消息体多源回退）
+
+后续可接入真实 LLM Provider（扩展 `ai-provider.js` 注册表）与产品知识库（复用 `context` 字段）。
 
 ## 8. 落地清单
 

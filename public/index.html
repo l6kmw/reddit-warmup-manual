@@ -687,6 +687,42 @@
         </div>
       </div>
     </div>
+    <div class="panel">
+      <h2>AI 客服回复 <small>/api/outreach/reply/*</small></h2>
+      <div class="panel-body">
+        <div class="outreach-bar">
+          <span class="badge" id="replyBadge">未启动</span>
+          <span class="badge" id="replyRuns">已轮询 0 次</span>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label for="replyInterval">轮询间隔（分钟）</label>
+            <input type="number" id="replyInterval" value="10" min="1" max="300">
+          </div>
+          <div class="col">
+            <label for="replyMax">每轮最多回复</label>
+            <input type="number" id="replyMax" value="10" min="1" max="50">
+          </div>
+          <div class="col">
+            <label for="replyProvider">回复引擎</label>
+            <select id="replyProvider">
+              <option value="openai">OpenAI (gpt-5.6-sol)</option>
+              <option value="mock">Mock 模板</option>
+            </select>
+          </div>
+        </div>
+        <div class="notice">
+          自动检测「已私信用户」的 Chat 新回复，AI（当前 mock 模板）生成回复并自动发送；
+          购买意向 / 投诉 / 辱骂 / 一般疑问自动转人工（置 needsHuman，不再自动回）。发送账号沿用上方「目标账号」。
+        </div>
+        <div class="outreach-actions">
+          <button type="button" class="btn-outreach primary" id="btnReplyStart" onclick="startReplyJobCall()">▶ 启动客服轮询</button>
+          <button type="button" class="btn-outreach stop" id="btnReplyStop" onclick="stopReplyJobCall()">⏹ 停止</button>
+          <button type="button" class="btn-outreach" onclick="refreshReplyStatus()">刷新</button>
+        </div>
+        <div class="hint outreach-status-line" id="replyStatus">未启动</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -950,6 +986,45 @@
     setOStatus('已请求停止');
   };
 
+  // ==================== 客服回复（后台轮询） ====================
+  window.refreshReplyStatus = async function () {
+    try {
+      const res = await fetch('/api/outreach/reply/status');
+      const s = await res.json();
+      const badge = $('replyBadge');
+      if (s.enabled && s.running) { badge.textContent = '回复中'; badge.className = 'badge online'; }
+      else if (s.enabled) { badge.textContent = '轮询中'; badge.className = 'badge'; }
+      else { badge.textContent = '未启动'; badge.className = 'badge'; }
+      $('replyRuns').textContent = `已轮询 ${s.runCount || 0} 次`;
+      const last = s.lastResult && s.lastResult.summary;
+      $('replyStatus').textContent = last
+        ? `最近一轮：检测 ${last.detected || 0} · 回复 ${last.replied || 0} · 转人工 ${last.needs_human || 0} · 失败 ${last.failed || 0}${s.lastError ? ' · ' + s.lastError : ''}`
+        : (s.stopped ? '已停止' : '未启动');
+    } catch { /* ignore */ }
+  };
+
+  window.startReplyJobCall = async function () {
+    const target = { type: $('targetType').value, value: $('targetValue').value.trim() };
+    if (!target.value) { $('replyStatus').textContent = '请先填写上方「目标账号」'; return; }
+    const intervalMs = Math.max(1, Number($('replyInterval').value || 10)) * 60000;
+    const config = { target, provider: { type: $('replyProvider').value }, maxReplies: Number($('replyMax').value || 10) };
+    const res = await fetch('/api/outreach/reply/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config, intervalMs }),
+    });
+    const data = await res.json();
+    $('replyStatus').textContent = res.ok
+      ? `客服轮询已启动（每 ${Math.round(intervalMs / 60000)} 分钟一轮）`
+      : '启动失败：' + (data.error || res.status);
+    setTimeout(refreshReplyStatus, 800);
+  };
+
+  window.stopReplyJobCall = async function () {
+    if (!confirm('停止客服回复轮询？')) return;
+    await fetch('/api/outreach/reply/stop', { method: 'POST' });
+    $('replyStatus').textContent = '已请求停止';
+    setTimeout(refreshReplyStatus, 800);
+  };
+
   window.refreshOutreach = async function () {
     try {
       const [stRes, qRes] = await Promise.all([
@@ -1094,6 +1169,8 @@
   setInterval(pollStatus, 2000);
   setInterval(pollLogs, 1500);
   setInterval(refreshOutreach, 3000);
+  setInterval(refreshReplyStatus, 3000);
+  refreshReplyStatus();
   pollStatus();
   pollLogs();
   refreshOutreach();

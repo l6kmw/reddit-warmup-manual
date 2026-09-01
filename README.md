@@ -39,6 +39,32 @@ node lib/outreach/sender.js --config /tmp/outreach-send.json
 | `compose`（默认） | 经 AdsPower 浏览器打开 Reddit 私信 compose 页面发送；兼容新版 UI，发送后消息同步出现在 Chat 会话中。实测不受 Chat 房间创建限额影响 |
 | `matrix` | 直连 Reddit Chat 的 Matrix API（`matrix.redditspace.com`）发送，无需操作页面 DOM。注意 Reddit 对 `createRoom` 有 **24 小时房间数量限额**（`M_LIMIT_EXCEEDED`），新用户量大时会触限；触限后条目标记 `failed`，可 `requeue` 等限额重置后重发 |
 
+## AI 客服对话（Replier）
+
+发送成功（进入 Chat 会话）的用户，可启动客服轮询：**自动检测对方新回复 → AI 生成回复 → 自动发送 → 全量审计**，敏感场景自动转人工。
+
+- **会话表**：`state/outreach-conversations.json`（`username↔roomId`、`replyHistory`、`needsHuman`、`lastCheckAt`；首次读取自动兼容迁移旧 `outreach-contacted.json`）
+- **生成引擎**：`provider` 抽象（`lib/outreach/ai-provider.js`）
+  - `mock`：规则分类 + 模板（离线可用，适合无 key 环境）
+  - `openai`：OpenAI 兼容端点真实对话，默认 `https://www.888api.vip/v1` + 模型 `gpt-5.6-sol`；
+    API Key 从环境变量 `LLM_API_KEY`（或 `OPENAI_API_KEY`）读取，或 `config.apiKey`；**勿写入配置文件提交**
+  - 决策协议：模型回复以 `[NEEDS_HUMAN] 原因` 开头表示转人工（投诉/退款/辱骂/知识库覆盖不了的问题）
+- **知识库**：`state/outreach-kb.json`（条目：标题/关键词/内容）；AI 只能引用知识库回答业务，禁止编造
+  ```bash
+  node lib/outreach/kb.js --init              # 空库 + 模板示例
+  node lib/outreach/kb.js --add "标题|关键词1,关键词2|内容"
+  node lib/outreach/kb.js --list | --search "词" | --del <id>
+  ```
+- **回复策略**（`lib/outreach/reply-policy.js`）：寒暄 / 闲聊 / 致谢 → 自动回复；购买意向 / 投诉 / 辱骂 / 一般疑问 / 乱码 → `needs_human`（不自动回）
+- **轮询**：`POST /api/outreach/reply/start`（`{config:{target, provider}, intervalMs}`，默认 10 分钟一轮）；控制台「AI 客服回复」面板可启动/停止/查看状态；与发送/养号共用互斥锁
+- **手动跑一轮**：
+  ```bash
+  node lib/outreach/replier.js --config /tmp/reply.json
+  # {"target":{"type":"serial","value":"34"},"provider":{"type":"mock"},"maxReplies":10}
+  # 加 "dryRun": true 只生成不发送
+  ```
+- **审计**：回复/转人工/跳过/失败逐条写入 `logs/outreach-YYYY-MM-DD.jsonl`（`event=outreach.reply*`）
+
 ## 目录结构
 
 ```text
@@ -143,6 +169,9 @@ npm test
 | POST | `/api/outreach/discover` | 启动评论者发现并入队 |
 | POST | `/api/outreach/send` | 启动全自动发送（pending 队列） |
 | POST | `/api/outreach/stop` | 停止当前私信触达任务 |
+| GET | `/api/outreach/reply/status` | 客服回复后台任务状态（运行中/轮询次数/最近一轮结果） |
+| POST | `/api/outreach/reply/start` | 启动客服回复轮询（body: `{config, intervalMs}`） |
+| POST | `/api/outreach/reply/stop` | 停止客服回复轮询 |
 
 ## 日志与状态
 
