@@ -507,6 +507,9 @@
     .section-nav { top: 56px; }
     .section-nav a { padding: 7px 9px; }
   }
+  /* 单面板模块视图：outreach 家族一键只显示当前功能，网格单列全宽 */
+  .outreach-wrap.solo .outreach-grid { grid-template-columns: minmax(0, 1fr); }
+  .outreach-wrap.solo .outreach-grid > .panel { border-top: 2px solid var(--blue); }
 </style>
 </head>
 <body>
@@ -1432,10 +1435,17 @@
       if ($('logsView')) $('logsView').classList.remove('view-hidden');
     } else if (resolved === 'outreachSection' || resolved === 'queueView' || resolved === 'replyView' || resolved === 'kbSection') {
       if (outreach) outreach.classList.remove('view-hidden');
-      if (resolved === 'outreachSection' && configPanel) configPanel.classList.remove('view-hidden');
-      if (resolved === 'queueView' && $('queueView')) $('queueView').classList.remove('view-hidden');
-      if (resolved === 'replyView' && $('replyView')) $('replyView').classList.remove('view-hidden');
-      if (resolved === 'kbSection' && $('kbSection')) $('kbSection').classList.remove('view-hidden');
+      // 互斥显示：先隐藏 outreach 网格内全部面板，再打开当前模块
+      const gridPanels = outreach ? outreach.querySelectorAll('.outreach-grid > .panel') : [];
+      for (const pl of gridPanels) pl.classList.add('view-hidden');
+      let targetPanel = null;
+      if (resolved === 'outreachSection') targetPanel = configPanel;
+      else if (resolved === 'queueView') targetPanel = $('queueView');
+      else if (resolved === 'replyView') targetPanel = $('replyView');
+      else if (resolved === 'kbSection') targetPanel = $('kbSection');
+      if (targetPanel) targetPanel.classList.remove('view-hidden');
+      // 单面板视图：网格单列全宽，避免半屏留白
+      if (outreach) outreach.classList.add('solo');
       if (outreach) outreach.classList.add('view-enter');
     } else {
       location.hash = '#warmupView';
