@@ -165,6 +165,34 @@
   .q-status.failed { color: var(--err); background: rgba(255,97,89,.1); }
   .q-status.skipped { color: var(--muted); background: rgba(146,154,166,.1); }
   .queue-scroll { max-height: 420px; overflow-y: auto; }
+  .kb-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .kb-table th { position: sticky; top: 0; z-index: 2; background: #1a2028; color: var(--muted); font-size: 10px; text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border-strong); }
+  .kb-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; }
+  .kb-table tr:hover td { background: rgba(255,255,255,.02); }
+  .kb-title { color: var(--text); font-weight: 700; }
+  .kb-content { color: var(--muted); max-width: 420px; white-space: pre-wrap; }
+  .kb-keywords { color: var(--blue); font-family: var(--mono); font-size: 10px; }
+  .kb-actions { display: flex; gap: 5px; white-space: nowrap; }
+  .kb-actions button { min-height: 28px; padding: 4px 8px; font-size: 10px; background: var(--panel3); border-color: var(--border-strong); }
+  .kb-actions button:hover { background: #303844; }
+  .kb-actions button.danger { color: var(--err); }
+  .kb-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+  .kb-toolbar input { flex: 1; }
+  .kb-toolbar button { min-height: 38px; }
+  .kb-empty { color: var(--faint); text-align: center; padding: 20px; }
+  .kb-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; border: 1px solid var(--border); color: var(--muted); }
+  .kb-badge.active { color: var(--ok); border-color: rgba(79,192,106,.35); }
+  .kb-badge.draft { color: var(--warn); border-color: rgba(233,185,73,.35); }
+  .kb-badge.disabled { color: var(--faint); }
+  .kb-modal { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.7); align-items: center; justify-content: center; padding: 20px; }
+  .kb-modal.open { display: flex; }
+  .kb-dialog { width: min(680px, 100%); max-height: 90vh; overflow: auto; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+  .kb-dialog h3 { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .kb-form { padding: 16px; }
+  .kb-form label { margin-top: 12px; }
+  .kb-form label:first-child { margin-top: 0; }
+  .kb-form textarea { min-height: 150px; }
+  .kb-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .btn-outreach { background: var(--panel3); color: var(--text); border-color: var(--border-strong); }
   .btn-outreach:hover { background: #292f38; }
   .btn-outreach.primary { background: var(--accent); color: #fff; border-color: transparent; }
@@ -405,6 +433,7 @@
   <a href="#publishSection">发帖门控</a>
   <a href="#advancedSection">高级设置</a>
   <a href="#outreachSection" style="color:var(--accent)">私信触达</a>
+  <a href="#kbSection" style="color:var(--blue)">知识库</a>
 </nav>
 
 <div class="layout">
@@ -721,6 +750,43 @@
           <button type="button" class="btn-outreach" onclick="refreshReplyStatus()">刷新</button>
         </div>
         <div class="hint outreach-status-line" id="replyStatus">未启动</div>
+      </div>
+    </div>
+    <div class="panel" id="kbSection">
+      <h2>客服知识库 <small id="kbCount">加载中</small></h2>
+      <div class="panel-body">
+        <div class="kb-toolbar">
+          <input type="search" id="kbSearch" placeholder="搜索标题、关键词或知识内容">
+          <button type="button" onclick="openKbEditor()">＋ 新增</button>
+          <button type="button" onclick="refreshKb()">刷新</button>
+        </div>
+        <div class="queue-scroll">
+          <table class="kb-table">
+            <thead><tr><th>标题</th><th>关键词</th><th>状态</th><th>知识内容</th><th>更新时间</th><th>操作</th></tr></thead>
+            <tbody id="kbBody"><tr><td colspan="6" class="kb-empty">加载中…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="hint" id="kbStatus">知识库内容会按用户消息检索后注入 AI 客服。</div>
+      </div>
+    </div>
+    <div class="kb-modal" id="kbModal" role="dialog" aria-modal="true" aria-labelledby="kbDialogTitle">
+      <div class="kb-dialog">
+        <h3 id="kbDialogTitle">新增知识</h3>
+        <form class="kb-form" onsubmit="saveKb(event)">
+          <input type="hidden" id="kbId">
+          <label for="kbTitle">标题</label>
+          <input type="text" id="kbTitle" required placeholder="例如：美国区物流政策">
+          <label for="kbKeywords">关键词（逗号分隔）</label>
+          <input type="text" id="kbKeywords" placeholder="shipping, delivery, 物流">
+          <label for="kbState">状态</label>
+          <select id="kbState"><option value="active">已启用</option><option value="draft">草稿</option><option value="disabled">已停用</option></select>
+          <label for="kbContent">知识内容</label>
+          <textarea id="kbContent" required placeholder="填写 AI 可以引用的准确事实、限制和政策"></textarea>
+          <div class="kb-form-actions">
+            <button type="button" onclick="closeKbEditor()">取消</button>
+            <button type="submit">保存知识</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -1165,6 +1231,76 @@
       if (autoScroll) box.scrollTop = box.scrollHeight;
     } catch { /* ignore */ }
   }
+
+  // ==================== 知识库可视化管理 ====================
+  let kbItems = [];
+  const escapeHtml = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const kbStatusLabel = { active: '已启用', draft: '草稿', disabled: '已停用' };
+
+  function renderKb(items) {
+    kbItems = Array.isArray(items) ? items : [];
+    $('kbCount').textContent = `共 ${kbItems.length} 条`;
+    $('kbBody').innerHTML = kbItems.length ? kbItems.map((item) => {
+      const status = item.status || 'active';
+      const updated = item.updatedAt || item.createdAt || '';
+      return `<tr>
+        <td><div class="kb-title">${escapeHtml(item.title)}</div><div class="hint">${escapeHtml(item.id)}</div></td>
+        <td class="kb-keywords">${escapeHtml((item.keywords || []).join(', '))}</td>
+        <td><span class="kb-badge ${escapeHtml(status)}">${escapeHtml(kbStatusLabel[status] || status)}</span></td>
+        <td class="kb-content">${escapeHtml(item.content)}</td>
+        <td class="mono">${escapeHtml(updated ? new Date(updated).toLocaleString('zh-CN') : '-')}</td>
+        <td><div class="kb-actions"><button type="button" onclick="openKbEditor('${escapeHtml(item.id)}')">编辑</button><button type="button" class="danger" onclick="deleteKb('${escapeHtml(item.id)}')">删除</button></div></td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="6" class="kb-empty">暂无知识条目</td></tr>';
+  }
+
+  window.refreshKb = async function () {
+    const q = $('kbSearch').value.trim();
+    try {
+      const res = await fetch('/api/outreach/kb' + (q ? `?q=${encodeURIComponent(q)}` : ''));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.status);
+      renderKb(data.items);
+      $('kbStatus').textContent = q ? `已检索「${q}」，显示 ${data.total} 条` : '知识库内容会按用户消息检索后注入 AI 客服。';
+    } catch (error) { $('kbStatus').textContent = '加载失败：' + error.message; }
+  };
+
+  window.openKbEditor = function (id = '') {
+    const item = kbItems.find((entry) => entry.id === id);
+    $('kbDialogTitle').textContent = item ? '编辑知识' : '新增知识';
+    $('kbId').value = item ? item.id : '';
+    $('kbTitle').value = item ? item.title : '';
+    $('kbKeywords').value = item ? (item.keywords || []).join(', ') : '';
+    $('kbState').value = item ? (item.status || 'active') : 'active';
+    $('kbContent').value = item ? item.content : '';
+    $('kbModal').classList.add('open');
+    $('kbTitle').focus();
+  };
+  window.closeKbEditor = function () { $('kbModal').classList.remove('open'); };
+  window.saveKb = async function (event) {
+    event.preventDefault();
+    const id = $('kbId').value;
+    const payload = { title: $('kbTitle').value.trim(), keywords: $('kbKeywords').value.split(/[,，]/).map((s) => s.trim()).filter(Boolean), status: $('kbState').value, content: $('kbContent').value.trim() };
+    if (!payload.title || !payload.content) { $('kbStatus').textContent = '标题和内容不能为空'; return; }
+    const res = await fetch('/api/outreach/kb' + (id ? `/${encodeURIComponent(id)}` : ''), { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (!res.ok) { $('kbStatus').textContent = '保存失败：' + (data.error || res.status); return; }
+    closeKbEditor();
+    $('kbStatus').textContent = '已保存知识条目';
+    refreshKb();
+  };
+  window.deleteKb = async function (id) {
+    const item = kbItems.find((entry) => entry.id === id);
+    if (!item || !confirm(`确认删除「${item.title}」？`)) return;
+    const res = await fetch(`/api/outreach/kb/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) { $('kbStatus').textContent = '删除失败：' + (data.error || res.status); return; }
+    $('kbStatus').textContent = '已删除知识条目';
+    refreshKb();
+  };
+  $('kbSearch').addEventListener('input', (() => { let timer; return () => { clearTimeout(timer); timer = setTimeout(refreshKb, 220); }; })());
+  $('kbModal').addEventListener('click', (event) => { if (event.target === $('kbModal')) closeKbEditor(); });
+  refreshKb();
 
   setInterval(pollStatus, 2000);
   setInterval(pollLogs, 1500);

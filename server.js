@@ -234,6 +234,7 @@ const OUTREACH_SENDER = path.join(ROOT, 'lib', 'outreach', 'sender.js');
 const OUTREACH_REPLIER = path.join(ROOT, 'lib', 'outreach', 'replier.js');
 const OUTREACH_QUEUE = path.join(ROOT, 'lib', 'outreach', 'queue.js');
 const { parseOutreachConfig, SUB_KEYWORD_PRESETS } = require(path.join(ROOT, 'lib', 'config'));
+const kb = require(path.join(ROOT, 'lib', 'outreach', 'kb'));
 const {
   readQueue, listQueue, queueStats, dailySentCount, enqueueCandidates, STATUS,
 } = require(OUTREACH_QUEUE);
@@ -462,9 +463,27 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && pathname === '/api/outreach/presets') {
       return json(res, 200, { presets: SUB_KEYWORD_PRESETS });
     }
-    if (req.method === 'GET' && pathname === '/api/outreach/status') {
-      return json(res, 200, outreachStatusPayload());
+    if (req.method === 'GET' && pathname === '/api/outreach/kb') {
+      const q = String(url.searchParams.get('q') || '').trim();
+      const items = q ? kb.search(q, { topK: 100, minScore: 0, includeInactive: true }) : kb.listItems();
+      return json(res, 200, { items, total: items.length, query: q });
     }
+    if (req.method === 'POST' && pathname === '/api/outreach/kb') {
+      const body = await readBody(req);
+      if (!body.title || !String(body.content || '').trim()) return json(res, 400, { error: '标题和内容不能为空' });
+      const result = kb.addItem(body);
+      return json(res, result.ok ? 200 : 400, result);
+    }
+    const kbMatch = pathname.match(/^\/api\/outreach\/kb\/([^/]+)$/);
+    if (kbMatch && req.method === 'PUT') {
+      const result = kb.updateItem(decodeURIComponent(kbMatch[1]), await readBody(req));
+      return json(res, result.ok ? 200 : 400, result);
+    }
+    if (kbMatch && req.method === 'DELETE') {
+      const result = kb.removeItem(decodeURIComponent(kbMatch[1]));
+      return json(res, result.ok ? 200 : 404, result);
+    }
+
     if (req.method === 'GET' && pathname === '/api/outreach/queue') {
       const status = url.searchParams.get('status') || null;
       const items = listQueue({ status: status === 'all' || !status ? null : status, limit: 500 });
