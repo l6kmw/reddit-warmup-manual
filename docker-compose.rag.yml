@@ -1,0 +1,27 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.15.5
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+
+  redwarm-rag:
+    build: ./rag-service
+    restart: unless-stopped
+    depends_on:
+      - qdrant
+    ports:
+      - "8090:8090"
+    environment:
+      RAG_ADDR: ":8090"
+      QDRANT_URL: "http://qdrant:6333"
+      QDRANT_COLLECTION: "redwarm_knowledge"
+      KB_SOURCE: "/app/state/outreach-kb.json"
+      EMBEDDING_BASE_URL: "${EMBEDDING_BASE_URL:-https://api.openai.com/v1}"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
+      EMBEDDING_DIM: "${EMBEDDING_DIM:-1536}"
+      EMBEDDING_API_KEY: "${EMBEDDING_API_KEY}"
+    volumes:
+      - ./state:/app/state:ro
