@@ -413,8 +413,45 @@
     .outreach-grid .stats { gap: 6px; }
     .outreach-grid .stat { min-height: 70px; }
   }
-</style>
-</head>
+  /* ---- workspace shell: independent module views ---- */
+  :root { --sidebar-width: 232px; --content-max: 1480px; }
+  body { background: #090b0e; }
+  .section-nav {
+    position: fixed; left: 0; top: 72px; bottom: 0; width: var(--sidebar-width);
+    display: flex; flex-direction: column; align-items: stretch; gap: 3px; overflow-y: auto;
+    padding: 18px 12px 24px; border-right: 1px solid var(--border); border-bottom: 0;
+    background: #0d1014; z-index: 15;
+  }
+  .section-nav::before { content: 'WORKSPACE'; padding: 0 12px 10px; color: var(--faint); font: 10px/1 var(--mono); letter-spacing: .14em; }
+  .section-nav a { display: block; padding: 10px 12px; border: 1px solid transparent; border-radius: 5px; color: var(--muted); font-size: 12px; font-weight: 650; }
+  .section-nav a:hover, .section-nav a.active { color: var(--text); background: #171c22; border-color: var(--border-strong); }
+  .section-nav a.active::before { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 8px 2px 0; border-radius: 1px; background: var(--accent); }
+  .layout, .outreach-wrap { max-width: var(--content-max); margin-left: calc(var(--sidebar-width) + 24px); margin-right: 24px; }
+  .layout { grid-template-columns: minmax(0, 1fr); padding-top: 24px; }
+  .layout > .panel:first-child { max-width: 980px; }
+  .layout > .monitor { max-width: none; }
+  .outreach-wrap { padding-left: 0; padding-right: 0; }
+  .view-hidden { display: none !important; }
+  .view-enter { animation: viewEnter .18s ease-out; }
+  @keyframes viewEnter { from { opacity: .25; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .view-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin: 24px 0 14px; }
+  .view-heading h2 { font-size: 20px; letter-spacing: 0; }
+  .view-heading p { color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .module-only { min-height: 40vh; }
+  @media (max-width: 900px) {
+    :root { --sidebar-width: 0px; }
+    .section-nav { position: sticky; top: 64px; width: 100%; height: auto; flex-direction: row; align-items: center; overflow-x: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--border); }
+    .section-nav::before { display: none; }
+    .section-nav a { flex: none; padding: 8px 10px; }
+    .layout, .outreach-wrap { margin-left: 12px; margin-right: 12px; }
+    .layout { padding-left: 0; padding-right: 0; }
+    .view-heading { margin-top: 16px; }
+  }
+  @media (max-width: 520px) {
+    .view-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+    .layout > .panel:first-child, .layout > .monitor { max-width: none; }
+  }
+
 <body>
 <header>
   <div class="brand-mark" aria-hidden="true">R</div>
@@ -426,15 +463,23 @@
   <div class="status-run" id="runState"><span class="dot"></span><span id="runStateText">空闲</span></div>
 </header>
 
-<nav class="section-nav" aria-label="参数分区">
-  <a href="#targetSection">目标账号</a>
-  <a href="#communitySection">社区选择</a>
-  <a href="#behaviorSection">行为参数</a>
+<nav class="section-nav" aria-label="功能模块">
+  <a href="#overview">总览</a>
+  <a href="#targetSection">账号目标</a>
+  <a href="#communitySection">社区规则</a>
+  <a href="#behaviorSection">行为策略</a>
   <a href="#publishSection">发帖门控</a>
   <a href="#advancedSection">高级设置</a>
-  <a href="#outreachSection" style="color:var(--accent)">私信触达</a>
-  <a href="#kbSection" style="color:var(--blue)">知识库</a>
+  <a href="#outreachSection">私信触达</a>
+  <a href="#queueView">发送队列</a>
+  <a href="#replyView">AI 客服</a>
+  <a href="#kbSection">知识库</a>
+  <a href="#logsView">运行日志</a>
 </nav>
+
+<main id="overview" class="view-heading" style="margin-left:calc(var(--sidebar-width) + 24px); margin-right:24px; max-width:var(--content-max)">
+  <div><h2>运行工作台</h2><p>账号预热、触达与客服运营集中管理</p></div>
+</main>
 
 <div class="layout">
   <!-- 左：参数表单 -->
@@ -604,7 +649,7 @@
   </div>
 
   <!-- 右：状态与日志 -->
-  <div class="monitor">
+  <div class="monitor" id="logsView">
     <div class="stats">
       <div class="stat"><div class="v" id="stVisited">-</div><div class="k">浏览板块</div></div>
       <div class="stat"><div class="v" id="stReads">-</div><div class="k">阅读帖子</div></div>
@@ -698,7 +743,7 @@
         <div class="hint outreach-status-line" id="oStatus">等待操作…</div>
       </div>
     </div>
-    <div class="panel">
+    <div class="panel" id="queueView">
       <h2>候选队列与发送记录 <small>只读</small></h2>
       <div class="panel-body">
         <div class="stats" style="grid-template-columns:repeat(5,1fr)">
@@ -716,7 +761,7 @@
         </div>
       </div>
     </div>
-    <div class="panel">
+    <div class="panel" id="replyView">
       <h2>AI 客服回复 <small>/api/outreach/reply/*</small></h2>
       <div class="panel-body">
         <div class="outreach-bar">
@@ -1131,9 +1176,9 @@
           const time = item.sentAt || item.createdAt || '';
           return `<tr>
             <td><span class="q-status ${item.status}">${item.status}</span></td>
-            <td class="mono"><strong>${escapeHtml(item.username)}</strong></td>
-            <td>${escapeHtml(item.postTitle || '')}</td>
-            <td><span title="${escapeHtml(item.draft || '')}">${escapeHtml(draft)}</span></td>
+            <td class="mono"><strong>${kbEscapeHtml(item.username)}</strong></td>
+            <td>${kbEscapeHtml(item.postTitle || '')}</td>
+            <td><span title="${kbEscapeHtml(item.draft || '')}">${kbEscapeHtml(draft)}</span></td>
             <td class="mono">${time ? new Date(time).toLocaleString('zh-CN', { hour12: false }) : '-'}</td>
           </tr>`;
         }).join('');
@@ -1143,7 +1188,7 @@
     }
   };
 
-  function escapeHtml(s) {
+  function kbEscapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     }[c]));
@@ -1234,7 +1279,7 @@
 
   // ==================== 知识库可视化管理 ====================
   let kbItems = [];
-  const escapeHtml = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // 使用上方已有的 HTML 转义函数，避免重复定义
   const kbStatusLabel = { active: '已启用', draft: '草稿', disabled: '已停用' };
 
   function renderKb(items) {
@@ -1244,12 +1289,12 @@
       const status = item.status || 'active';
       const updated = item.updatedAt || item.createdAt || '';
       return `<tr>
-        <td><div class="kb-title">${escapeHtml(item.title)}</div><div class="hint">${escapeHtml(item.id)}</div></td>
-        <td class="kb-keywords">${escapeHtml((item.keywords || []).join(', '))}</td>
-        <td><span class="kb-badge ${escapeHtml(status)}">${escapeHtml(kbStatusLabel[status] || status)}</span></td>
-        <td class="kb-content">${escapeHtml(item.content)}</td>
-        <td class="mono">${escapeHtml(updated ? new Date(updated).toLocaleString('zh-CN') : '-')}</td>
-        <td><div class="kb-actions"><button type="button" onclick="openKbEditor('${escapeHtml(item.id)}')">编辑</button><button type="button" class="danger" onclick="deleteKb('${escapeHtml(item.id)}')">删除</button></div></td>
+        <td><div class="kb-title">${kbEscapeHtml(item.title)}</div><div class="hint">${kbEscapeHtml(item.id)}</div></td>
+        <td class="kb-keywords">${kbEscapeHtml((item.keywords || []).join(', '))}</td>
+        <td><span class="kb-badge ${kbEscapeHtml(status)}">${kbEscapeHtml(kbStatusLabel[status] || status)}</span></td>
+        <td class="kb-content">${kbEscapeHtml(item.content)}</td>
+        <td class="mono">${kbEscapeHtml(updated ? new Date(updated).toLocaleString('zh-CN') : '-')}</td>
+        <td><div class="kb-actions"><button type="button" onclick="openKbEditor('${kbEscapeHtml(item.id)}')">编辑</button><button type="button" class="danger" onclick="deleteKb('${kbEscapeHtml(item.id)}')">删除</button></div></td>
       </tr>`;
     }).join('') : '<tr><td colspan="6" class="kb-empty">暂无知识条目</td></tr>';
   }
@@ -1302,7 +1347,52 @@
   $('kbModal').addEventListener('click', (event) => { if (event.target === $('kbModal')) closeKbEditor(); });
   refreshKb();
 
-  setInterval(pollStatus, 2000);
+  // 独立模块视图：每个 hash 只展示一个工作界面，保留原有表单逻辑与 API。
+  function setModuleView() {
+    const route = (location.hash || '#overview').slice(1);
+    const warmupSections = ['targetSection', 'communitySection', 'behaviorSection', 'publishSection', 'advancedSection'];
+    const section = $(route);
+    const layout = document.querySelector('.layout');
+    const outreach = $('outreachSection');
+    const configPanel = outreach ? outreach.querySelector('.outreach-grid > .panel:first-child') : null;
+    const moduleMap = {
+      queueView: $('queueView'), replyView: $('replyView'), kbSection: $('kbSection'),
+    };
+    // 默认隐藏所有大块，随后打开当前模块。
+    if ($('overview')) $('overview').classList.add('view-hidden');
+    if (layout) layout.classList.add('view-hidden');
+    if (outreach) outreach.classList.add('view-hidden');
+    for (const panel of Object.values(moduleMap)) if (panel) panel.classList.add('view-hidden');
+    if (route === 'overview') {
+      if ($('overview')) $('overview').classList.remove('view-hidden');
+      if (layout) layout.classList.remove('view-hidden');
+      if (outreach) outreach.classList.remove('view-hidden');
+    } else if (warmupSections.includes(route)) {
+      if (layout) layout.classList.remove('view-hidden');
+      for (const field of warmupSections) if ($(field)) $(field).classList.toggle('view-hidden', field !== route);
+      if (layout) layout.classList.add('view-enter');
+    } else if (route === 'logsView') {
+      if (layout) layout.classList.remove('view-hidden');
+      const formPanel = layout && layout.querySelector(':scope > .panel:first-child');
+      if (formPanel) formPanel.classList.add('view-hidden');
+      if ($('logsView')) $('logsView').classList.remove('view-hidden');
+    } else if (route === 'outreachSection' || route === 'queueView' || route === 'replyView' || route === 'kbSection') {
+      if (outreach) outreach.classList.remove('view-hidden');
+      if (route === 'outreachSection' && configPanel) configPanel.classList.remove('view-hidden');
+      if (route === 'queueView' && $('queueView')) $('queueView').classList.remove('view-hidden');
+      if (route === 'replyView' && $('replyView')) $('replyView').classList.remove('view-hidden');
+      if (route === 'kbSection' && $('kbSection')) $('kbSection').classList.remove('view-hidden');
+      if (outreach) outreach.classList.add('view-enter');
+    } else {
+      location.hash = '#overview';
+      return;
+    }
+    document.querySelectorAll('.section-nav a').forEach((link) => link.classList.toggle('active', link.getAttribute('href') === `#${route}`));
+  }
+  window.addEventListener('hashchange', setModuleView);
+  setModuleView();
+
+
   setInterval(pollLogs, 1500);
   setInterval(refreshOutreach, 3000);
   setInterval(refreshReplyStatus, 3000);
