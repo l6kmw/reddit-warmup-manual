@@ -428,7 +428,6 @@
   .section-nav a.active::before { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 8px 2px 0; border-radius: 1px; background: var(--accent); }
   .layout, .outreach-wrap { max-width: var(--content-max); margin-left: calc(var(--sidebar-width) + 24px); margin-right: 24px; }
   .layout { grid-template-columns: minmax(0, 1fr); padding-top: 24px; }
-  .layout > .panel:first-child { max-width: 980px; }
   .layout > .monitor { max-width: none; }
   .outreach-wrap { padding-left: 0; padding-right: 0; }
   .view-hidden { display: none !important; }
@@ -1423,10 +1422,12 @@
     if (resolved === 'overview') {
       if ($('overview')) $('overview').classList.remove('view-hidden');
       if (layout) layout.classList.remove('view-hidden');
+      if ($('logsView')) $('logsView').classList.remove('view-hidden');
       if (outreach) outreach.classList.remove('view-hidden');
     } else if (resolved === 'warmupView') {
-      // 养号配置：目标账号/社区/行为/发帖/高级 全部集中同屏展示
+      // 养号配置：目标账号/社区/行为/发帖/高级 集中同屏；日志面板归「运行日志」模块
       if (layout) layout.classList.remove('view-hidden');
+      if ($('logsView')) $('logsView').classList.add('view-hidden');
       if (layout) layout.classList.add('view-enter');
     } else if (resolved === 'logsView') {
       if (layout) layout.classList.remove('view-hidden');
