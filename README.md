@@ -52,7 +52,7 @@ node lib/outreach/personalize.js --config /tmp/pers-cfg.json --limit 5
 node lib/outreach/personalize.js --config /tmp/pers-cfg.json --apply --limit 20
 ```
 
-个性化产出会过校验（占位符残留 / 模板句式黑名单 / 长度 15–90 词），不合格或 LLM 不可用一律保留原稿；已个性化条目（`personalizedAt`）幂等跳过。LLM 复用 `openai` provider（888api.vip / `gpt-5.6-sol`，key 走环境变量）。
+个性化产出会过校验（占位符残留 / 模板句式黑名单 / 长度 15–90 词），不合格或 LLM 不可用一律保留原稿；已个性化条目（`personalizedAt`）幂等跳过。LLM 复用 `openai` provider（端点/模型走 `LLM_BASE_URL` / `LLM_MODEL` 环境变量，key 走环境变量）。
 
 ## AI 客服对话（Replier）
 
@@ -61,7 +61,8 @@ node lib/outreach/personalize.js --config /tmp/pers-cfg.json --apply --limit 20
 - **会话表**：`state/outreach-conversations.json`（`username↔roomId`、`replyHistory`、`needsHuman`、`lastCheckAt`；首次读取自动兼容迁移旧 `outreach-contacted.json`）
 - **生成引擎**：`provider` 抽象（`lib/outreach/ai-provider.js`）
   - `mock`：规则分类 + 模板（离线可用，适合无 key 环境）
-  - `openai`：OpenAI 兼容端点真实对话，默认 `https://www.888api.vip/v1` + 模型 `gpt-5.6-sol`；
+  - `openai`：OpenAI 兼容端点真实对话，默认 `https://api.openai.com/v1` + 模型 `gpt-4o-mini`；
+    端点/模型可分别用环境变量 `LLM_BASE_URL` / `LLM_MODEL` 覆盖（任意 OpenAI 兼容中转均可）；
     API Key 从环境变量 `LLM_API_KEY`（或 `OPENAI_API_KEY`）读取，或 `config.apiKey`；**勿写入配置文件提交**
   - 决策协议：模型回复以 `[NEEDS_HUMAN] 原因` 开头表示转人工（投诉/退款/辱骂/知识库覆盖不了的问题）
 - **知识库**：`state/outreach-kb.json`（条目：标题/关键词/内容）；AI 只能引用知识库回答业务，禁止编造
